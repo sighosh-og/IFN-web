@@ -1,18 +1,19 @@
-// Inline icons so they follow the viewer theme via currentColor (16px, 2px stroke — Airbnb's viewer weight).
+// Inline icons so they follow the viewer theme via currentColor. Viewer glyphs share one structure:
+// 16px box, 1.5px stroke (3 in the 32 viewBox), round caps, ~11px optical size — arrow, close and grid match.
 
 export const IconClose = () => (
   <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden>
-    <path d="m6 6 20 20M26 6 6 26" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    <path d="m7 7 18 18M25 7 7 25" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
   </svg>
 );
 
 export const IconGrid = () => (
   <svg width="16" height="16" viewBox="0 0 32 32" aria-hidden>
     <g fill="none" stroke="currentColor" strokeWidth="3">
-      <rect x="3" y="3" width="10.5" height="10.5" rx="2" />
-      <rect x="18.5" y="3" width="10.5" height="10.5" rx="2" />
-      <rect x="3" y="18.5" width="10.5" height="10.5" rx="2" />
-      <rect x="18.5" y="18.5" width="10.5" height="10.5" rx="2" />
+      <rect x="5" y="5" width="9" height="9" rx="2" />
+      <rect x="18" y="5" width="9" height="9" rx="2" />
+      <rect x="5" y="18" width="9" height="9" rx="2" />
+      <rect x="18" y="18" width="9" height="9" rx="2" />
     </g>
   </svg>
 );

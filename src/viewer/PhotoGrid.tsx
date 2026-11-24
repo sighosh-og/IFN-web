@@ -3,6 +3,13 @@ import { photos } from './data';
 
 const GAP = 12; // Airbnb grid: 12px gutters, 16px tile radius
 
+// "Populate" reveal for when the gallery opens directly (View all): tiles on screen rise + fade in,
+// staggered top-left → bottom-right. Off-screen tiles are simply there.
+const REVEAL_MS = 520;
+const REVEAL_STEP = 22; // ms between tiles
+const REVEAL_MAX = 330; // cap on the last tile's delay, so a tall viewport doesn't drag
+const REVEAL_EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
+
 type Props = {
   current: number;
   /** tile hidden while the shared-element flyer is standing in for it */
@@ -10,10 +17,13 @@ type Props = {
   onPick: (i: number, tile: HTMLElement) => void;
   /** fires once tiles are positioned and the current one is scrolled into view */
   onLaidOut: (grid: HTMLElement) => void;
+  /** read once on mount: true when opened straight into the grid (not morphing in from a photo) */
+  reveal?: boolean;
 };
 
 /** Airbnb-style masonry: each photo drops into the currently shortest column, keeping its own aspect ratio. */
-export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut }: Props) {
+export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut, reveal = false }: Props) {
+  const revealOnMount = useRef(reveal);
   const scroller = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -48,6 +58,7 @@ export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut }: Props) {
     const it = layout.items[current];
     const s = scroller.current!;
     if (it) s.scrollTop = Math.max(0, it.y + 16 - (s.clientHeight - it.h) / 2);
+    if (revealOnMount.current) populate(box.current!, layout.items, s.scrollTop, s.clientHeight);
     onLaidOut(box.current!);
   }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -60,14 +71,50 @@ export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut }: Props) {
             type="button"
             className="pv__tile"
             data-index={i}
-            style={{ transform: `translate(${x}px, ${y}px)`, width: w, height: h, visibility: hiddenIndex === i ? 'hidden' : undefined }}
+            style={{ left: x, top: y, width: w, height: h, visibility: hiddenIndex === i ? 'hidden' : undefined }}
             aria-label={`Open photo ${i + 1} of ${photos.length}`}
             onClick={(e) => onPick(i, e.currentTarget)}
           >
-            <img src={photos[i].src} alt="" loading={Math.abs(i - current) < 16 ? 'eager' : 'lazy'} />
+            <img
+              ref={markIfLoaded}
+              src={photos[i].src}
+              alt=""
+              loading={Math.abs(i - current) < 16 ? 'eager' : 'lazy'}
+              onLoad={(e) => e.currentTarget.setAttribute('data-loaded', '')}
+            />
           </button>
         ))}
       </div>
     </div>
   );
+}
+
+/** cached images are complete before React's onLoad can matter: show them straight away */
+function markIfLoaded(img: HTMLImageElement | null) {
+  if (img?.complete && img.naturalWidth) img.setAttribute('data-loaded', '');
+}
+
+type Item = { i: number; x: number; y: number; w: number; h: number };
+
+/** Runs before first paint, so tiles start hidden (fill: backwards) — no flash of the finished grid. */
+function populate(grid: HTMLElement, items: Item[], scrollTop: number, viewH: number) {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const visible = items
+    .filter((it) => it.y + it.h > scrollTop && it.y < scrollTop + viewH)
+    // reading order with a slight diagonal: rows lead, columns trail a little
+    .sort((a, b) => a.y - scrollTop + a.x * 0.45 - (b.y - scrollTop + b.x * 0.45));
+  visible.forEach((it, rank) => {
+    const tile = grid.querySelector<HTMLElement>(`[data-index="${it.i}"]`);
+    if (!tile) return;
+    const delay = 60 + Math.min(rank * REVEAL_STEP, REVEAL_MAX);
+    tile.animate(
+      reduce
+        ? [{ opacity: 0 }, { opacity: 1 }]
+        : [
+            { opacity: 0, translate: '0 18px', scale: '0.97' },
+            { opacity: 1, translate: '0 0', scale: '1' },
+          ],
+      { duration: reduce ? 200 : REVEAL_MS, delay: reduce ? 0 : delay, easing: REVEAL_EASE, fill: 'backwards' },
+    );
+  });
 }

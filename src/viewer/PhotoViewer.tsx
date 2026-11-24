@@ -326,7 +326,13 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
                 <IconClose />
               </button>
             </header>
-            <PhotoGrid current={index} hiddenIndex={hideTile} onPick={pickFromGrid} onLaidOut={onGridLaidOut} />
+            <PhotoGrid
+              current={index}
+              hiddenIndex={hideTile}
+              onPick={pickFromGrid}
+              onLaidOut={onGridLaidOut}
+              reveal={transit?.kind !== 'toGrid'}
+            />
           </div>
         )}
       </div>

@@ -359,7 +359,8 @@
   background: var(--pv-skel);
   cursor: pointer;
 }
-.pv__tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pv__tile img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 320ms ease-out; }
+.pv__tile img[data-loaded] { opacity: 1; }
 
 @media (max-width: 1100px) {
   .pv { --pv-panel: 320px; }

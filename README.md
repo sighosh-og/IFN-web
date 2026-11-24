@@ -31,7 +31,7 @@ To drop a component *inside* a fragment, have `scripts/extract.mjs` replace that
   Tiles open the image view on that photo. "View all" opens the grid.
 - **Image view** (`src/viewer/`): layout and motion modelled on Airbnb's experience gallery.
   - Photo mode: one large photo with 32px corners, sized in JS to fit the stage at any window size. It has edge arrows, "n of N", a grid toggle and close. Photos sit inside one rounded mask. On next/prev the mask contracts (keeping its shape), then expands into the next photo's exact width × height while the photos crossfade inside it (520ms; a ~4% breath in, 2% photo scale). Photos are decoded before the swap starts. Keys: ← → Esc.
-  - Grid mode: 4-column masonry with 16px corners, no badges and no hover.
+  - Grid mode: 4-column masonry with 16px corners, no badges and no hover. Opened from View all, the on-screen tiles populate in a staggered rise + fade (18px, 0.97 → 1, 520ms, 22ms apart, top-left first; `populate()` in `PhotoGrid.tsx`), and each photo fades in once loaded. Coming from a photo, the morph is used instead.
   - Shared-element morphs: strip tile → photo on open, photo → strip tile on close, photo ⇄ grid tile. A single flyer runs all of them (`Transit` in `PhotoViewer.tsx`).
   - Review panel, docked right (Figma 5314:6610, "Panel v3"): rating pill + Verified Buy, title, full comment, variant chips, "See Translation" on Arabic reviews, dashed divider, then name · date and a helpful (thumbs-up) count. Icons live in public/viewer/. A "Photo n of N from this review" thumbnail row links photos from the same review, and the panel stays still while you step within one review.
   - Photos in the captured review cards also open the view.

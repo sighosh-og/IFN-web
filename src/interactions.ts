@@ -39,6 +39,14 @@ export function wireInteractions() {
     });
   }
 
+  // ---- Photos inside the captured review cards open the image view on that photo ----
+  on(document, 'click', (e: MouseEvent) => {
+    const img = (e.target as Element).closest('#ReviewArea img') as HTMLImageElement | null;
+    if (!img || img.closest('.cp') || !/\/review\//.test(img.src)) return;
+    e.preventDefault();
+    window.dispatchEvent(new CustomEvent('pdp:open-photo', { detail: { src: img.src } }));
+  });
+
   // ---- Generic translate-based sliders (recommendations, customer photos) ----
   const slide = (track: HTMLElement, dir: 1 | -1, prev?: HTMLButtonElement | null, next?: HTMLButtonElement | null) => {
     const viewport = track.parentElement!;

@@ -68,17 +68,13 @@ if (pillCanvas) {
   pillCanvas.parentNode.replaceWith(img);
 }
 
-// Customer photos strip → React slot (src/features/CustomerPhotos.tsx); keep its photos as data
+// Customer photos strip → React slot (src/features/CustomerPhotos.tsx).
+// Its photos + reviews come from scripts/fetch-photo-reviews.mjs → src/data/photoReviews.json.
 const photoStrip = document.querySelector('[class*=_carouselContainer_11xnc]');
 if (photoStrip) {
-  const total = Number((photoStrip.querySelector('[class*=_count_]')?.textContent ?? '').replace(/\D/g, '')) || 0;
-  const photos = [...photoStrip.querySelectorAll('[class*=_imagesContainer_] img')].map((img) => img.getAttribute('src'));
-  fs.mkdirSync(path.join(root, 'src/data'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'src/data/customerPhotos.json'), JSON.stringify({ total, photos }, null, 2) + '\n');
   const slot = document.createElement('div');
   slot.setAttribute('data-slot', 'customer-photos');
   photoStrip.replaceWith(slot);
-  console.log('customer photos', photos.length, 'of', total);
 }
 
 // trim recommendation carousels so the page stays light

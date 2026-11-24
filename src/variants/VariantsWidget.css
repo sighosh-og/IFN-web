@@ -1,0 +1,87 @@
+/* Prototype chrome, deliberately neutral so it never reads as noon UI. */
+.vw {
+  position: fixed;
+  left: 16px;
+  bottom: 16px;
+  z-index: 2147483000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  font-family: Noontree, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+.vw__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: #1c1c1e;
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 6px 20px rgba(0, 0, 0, 0.18);
+  cursor: pointer;
+  transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.vw__pill:active { transform: scale(0.97); }
+.vw__pillText { font-weight: 700; }
+.vw__pillValue { color: rgba(255, 255, 255, 0.6); }
+
+.vw__panel {
+  width: 240px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #1c1c1e;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08), 0 12px 32px rgba(0, 0, 0, 0.24);
+  transform-origin: bottom left;
+  animation: vw-in 180ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.vw__panel[hidden] { display: none; }
+@keyframes vw-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.97); }
+}
+
+.vw__head {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 2px 2px 10px;
+}
+
+.vw__group { margin: 0; padding: 0; border: 0; }
+.vw__group + .vw__group { margin-top: 12px; }
+.vw__label { padding: 0 2px 6px; font-size: 13px; font-weight: 600; }
+
+.vw__seg {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.vw__opt {
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+.vw__opt[aria-checked='true'] { background: #fff; color: #1c1c1e; font-weight: 700; }
+@media (hover: hover) and (pointer: fine) {
+  .vw__opt[aria-checked='false']:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+}
+.vw__opt:focus-visible, .vw__pill:focus-visible { outline: 2px solid #3866df; outline-offset: 2px; }

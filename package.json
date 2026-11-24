@@ -9,7 +9,8 @@
     "preview": "vite preview --port 5211",
     "capture": "node scripts/capture.mjs",
     "extract": "node scripts/extract.mjs",
-    "fetch-photos": "node scripts/fetch-photo-reviews.mjs"
+    "fetch-photos": "node scripts/fetch-photo-reviews.mjs",
+    "package": "sh scripts/package-noonprototype.sh"
   },
   "dependencies": {
     "react": "^18.3.1",

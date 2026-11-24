@@ -43,3 +43,7 @@ To drop a component *inside* a fragment, have `scripts/extract.mjs` replace that
   - View all tile: Blurred, where the 7th tile reads "View all (n)", or Gallery button, where the 7th photo stays sharp and a small frosted gallery button bottom-right opens the grid. The choice persists in localStorage and the URL (`?viewerTheme=black`).
 
 Not included: the sponsored ad strip above the breadcrumb, the cookie banner, and the hover mega-menus in the nav.
+
+## Deploying to noonprototype.com
+
+`npm run package` builds and writes `noon-web-pdp-deploy.zip`, which has `Dockerfile`, `nginx.conf.template` and `dist/` at the top level. It serves the static build with nginx on `$PORT`, per the platform contract (Cloud Run behind IAP). The zip is a build artifact and is gitignored. Deploy it through the `noon-prototype` MCP server: `register_app` → `create_source_upload` → PUT the zip → `finalize_source_upload` → `deploy_app`. You can also upload it on the site under New App.

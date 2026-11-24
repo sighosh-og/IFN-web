@@ -3,3 +3,5 @@ dist
 .vercel
 .DS_Store
 research/
+.deploy/
+noon-web-pdp-deploy.zip

@@ -128,26 +128,42 @@
   width: 100%;
   height: 100%;
 }
-.pv__img {
-  grid-area: 1 / 1;
-  display: block;
-  object-fit: cover;
+.pv__mask {
+  position: relative;
+  overflow: hidden;
   border-radius: 32px;
   background: var(--pv-skel);
+  isolation: isolate;
+  will-change: width, height;
+}
+/* photos keep their own fitted size, centred; the mask decides how much of them shows */
+.pv__img {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  display: block;
+  max-width: none;
   user-select: none;
   -webkit-user-drag: none;
 }
-/* Airbnb-style swap, softened: incoming (on top) fades in while settling 1.03 → 1;
-   outgoing fades a touch later and slower so the two always overlap — no see-through dip. */
-.pv__img--in {
-  position: relative;
-  z-index: 1;
-  animation: pv-in-op 300ms cubic-bezier(0.22, 1, 0.36, 1) both, pv-in-scale 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+/* timed to the mask (620ms, contract ≈ 0–225ms, expand ≈ 225–620ms) */
+.pv__img--out {
+  animation:
+    pv-out-scale 225ms cubic-bezier(0.45, 0, 0.55, 1) forwards,
+    pv-out-op 220ms ease-out 160ms forwards;
+  pointer-events: none;
 }
-.pv__img--out { animation: pv-out 340ms cubic-bezier(0.22, 1, 0.36, 1) 60ms forwards; pointer-events: none; }
+.pv__img--in {
+  z-index: 1;
+  animation:
+    pv-in-op 260ms ease-out 170ms both,
+    pv-in-scale 450ms cubic-bezier(0.22, 1, 0.36, 1) 170ms both;
+}
+@keyframes pv-out-scale { to { scale: 0.94; } }
+@keyframes pv-out-op { to { opacity: 0; } }
 @keyframes pv-in-op { from { opacity: 0; } }
-@keyframes pv-in-scale { from { transform: scale(1.03); } }
-@keyframes pv-out { to { opacity: 0; transform: scale(1.02); } }
+@keyframes pv-in-scale { from { scale: 1.08; } }
 
 .pv__arrow {
   position: absolute;
@@ -319,7 +335,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .pv__img--in { animation: pv-in-op 150ms ease-out both; }
-  .pv__img--out { animation: pv-fade-out 150ms ease-in forwards; }
+  .pv__img--out { animation: pv-out-op 150ms ease-in forwards; }
   .pv__flyer { display: none; }
   .pv__review { animation: pv-fade-in 150ms ease-out; }
 }

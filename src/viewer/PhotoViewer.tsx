@@ -28,7 +28,11 @@ type Transit = { kind: 'open' | 'close' | 'toPhoto' | 'toGrid'; index: number; f
 
 const FLY_MS = 460;
 const FLY_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft landing
-const SWAP_MS = 420;
+// Photo → photo: one rounded mask holds the photos. It contracts (keeping the current shape), then expands
+// into the next photo's exact width × height while the photos crossfade inside it.
+const SWAP_MS = 620;
+const CONTRACT_AT = 0.36; // share of SWAP_MS spent contracting
+const CONTRACT = 0.9; // how far the mask closes (relative to the smaller of the two photos)
 const PHOTO_R = 32; // Airbnb viewer radius
 const TILE_R = 16; // Airbnb grid radius
 
@@ -61,6 +65,9 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   const [box, setBox] = useState<Rect | null>(null); // the photo stage's content box
   const sheet = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
+  const mask = useRef<HTMLDivElement>(null);
+  const maskFrom = useRef<{ w: number; h: number } | null>(null);
+  const maskAnim = useRef<Animation | null>(null);
   const flyer = useRef<HTMLDivElement>(null);
   const focusBack = useRef<Element | null>(null);
 
@@ -144,7 +151,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   }, [transit]);
 
   // ---------- photo ↔ photo ----------
-  // preload + decode before swapping so the crossfade never shows an empty frame
+  // preload + decode before swapping so the mask never opens onto an empty frame
   const stepToken = useRef(0);
   const step = (i: number) => {
     if (i < 0 || i >= photos.length || i === index) return;
@@ -152,22 +159,44 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     const img = new Image();
     img.src = photos[i].src;
     Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 350))]).then(() => {
-      if (token === stepToken.current) onIndex(i);
+      if (token !== stepToken.current) return;
+      // the mask's live size (mid-animation if the user is clicking fast) is where the next morph starts
+      const r = mask.current?.getBoundingClientRect();
+      maskFrom.current = r ? { w: r.width, h: r.height } : null;
+      onIndex(i);
     });
   };
 
   const [leaving, setLeaving] = useState<number | null>(null);
   const last = useRef({ index, mode, open });
-  useEffect(() => {
+  useLayoutEffect(() => {
     const prev = last.current;
     last.current = { index, mode, open };
     const isStep = mode === 'photo' && prev.mode === 'photo' && open && prev.open;
     if (!isStep) { setLeaving(null); return; }
     if (prev.index === index) return;
     setLeaving(prev.index);
+
+    const el = mask.current;
+    const from = maskFrom.current;
+    const to = box ? fit(index, box) : null;
+    maskFrom.current = null;
+    if (el && from && to && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      maskAnim.current?.cancel();
+      // contract uniformly (same shape as now) to just inside both photos, then open into the next photo's size
+      const k = Math.min(CONTRACT, CONTRACT * Math.min(to.w / from.w, to.h / from.h));
+      maskAnim.current = el.animate(
+        [
+          { width: `${from.w}px`, height: `${from.h}px`, easing: 'cubic-bezier(0.45, 0, 0.55, 1)' },
+          { width: `${from.w * k}px`, height: `${from.h * k}px`, offset: CONTRACT_AT, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+          { width: `${to.w}px`, height: `${to.h}px` },
+        ],
+        { duration: SWAP_MS },
+      );
+    }
     const t = setTimeout(() => setLeaving(null), SWAP_MS);
     return () => clearTimeout(t);
-  }, [index, mode, open]);
+  }, [index, mode, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // keyboard
   useEffect(() => {
@@ -247,24 +276,30 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
                 <IconArrow dir="left" />
               </button>
               <div ref={frame} className="pv__frame">
-                {size && leaving !== null && photos[leaving] && box && (
-                  <img
-                    key={`out-${leaving}`}
-                    className="pv__img pv__img--out"
-                    src={photos[leaving].src}
-                    style={{ width: fit(leaving, box).w, height: fit(leaving, box).h }}
-                    alt=""
-                    aria-hidden
-                  />
-                )}
-                {size && (
-                  <img
-                    key={`in-${index}`}
-                    className="pv__img pv__img--in"
-                    src={photo.src}
+                {size && box && (
+                  <div
+                    ref={mask}
+                    className="pv__mask"
                     style={{ width: size.w, height: size.h, visibility: hidePhoto ? 'hidden' : undefined }}
-                    alt={`Customer photo ${index + 1}`}
-                  />
+                  >
+                    {leaving !== null && photos[leaving] && (
+                      <img
+                        key={`out-${leaving}`}
+                        className="pv__img pv__img--out"
+                        src={photos[leaving].src}
+                        style={{ width: fit(leaving, box).w, height: fit(leaving, box).h }}
+                        alt=""
+                        aria-hidden
+                      />
+                    )}
+                    <img
+                      key={`in-${index}`}
+                      className="pv__img pv__img--in"
+                      src={photo.src}
+                      style={{ width: size.w, height: size.h }}
+                      alt={`Customer photo ${index + 1}`}
+                    />
+                  </div>
                 )}
               </div>
               <button type="button" className="pv__arrow pv__arrow--next" aria-label="Next photo" disabled={index === photos.length - 1} onClick={() => step(index + 1)}>

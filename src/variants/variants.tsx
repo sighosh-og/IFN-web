@@ -21,6 +21,14 @@ export const VARIANT_GROUPS = {
     ],
     default: 'blur',
   },
+  photoSwap: {
+    label: 'Next photo',
+    options: [
+      { value: 'mask', label: 'Mask' },
+      { value: 'slide', label: 'Slide' },
+    ],
+    default: 'mask',
+  },
 } as const;
 
 type Groups = typeof VARIANT_GROUPS;

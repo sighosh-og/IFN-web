@@ -34,6 +34,12 @@ const FLY_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft land
 const SWAP_MS = 520;
 const CONTRACT_AT = 0.36; // share of SWAP_MS spent contracting
 const CONTRACT = 0.96; // how far the mask closes (relative to the smaller of the two photos) — kept subtle
+// "Slide" variant (from the reference recording): photos sit on a horizontal strip with a fixed gap. The current
+// one slides off at its own size; the next comes in beside it, starting at the outgoing photo's height and growing
+// to its fitted size as it lands. Fast start, soft landing.
+const SLIDE_MS = 460;
+const SLIDE_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+const SLIDE_GAP = 24;
 const PHOTO_R = 32; // Airbnb viewer radius
 const TILE_R = 16; // Airbnb grid radius
 
@@ -60,6 +66,7 @@ function fit(i: number, box: Rect): Rect {
  */
 export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClose }: Props) {
   const [theme] = useVariant('viewerTheme');
+  const [swap] = useVariant('photoSwap');
   const [present, setPresent] = useState(open);
   const [closing, setClosing] = useState(false);
   const [transit, setTransit] = useState<Transit | null>(null);
@@ -70,6 +77,9 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   const maskFrom = useRef<{ w: number; h: number } | null>(null);
   const maskAnim = useRef<Animation | null>(null);
   const flyer = useRef<HTMLDivElement>(null);
+  // photos sliding off the strip; on a fast click the ones still on screen are re-planned to move with it
+  const [leavers, setLeavers] = useState<{ id: number; index: number; from: string; to: string }[]>([]);
+  const leaverId = useRef(0);
   const focusBack = useRef<Element | null>(null);
 
   // ---------- open / close ----------
@@ -182,7 +192,43 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     const from = maskFrom.current;
     const to = box ? fit(index, box) : null;
     maskFrom.current = null;
-    if (el && from && to && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (swap === 'slide') {
+      // where the strip is right now (mid-slide on a fast click), read in the same frame as the leavers below
+      const m = el ? new DOMMatrixReadOnly(getComputedStyle(el).transform) : null;
+      const live = m ? { tx: m.e, s: m.a } : null;
+      maskAnim.current?.cancel();
+      if (el && to && box && !reduce) {
+        const dir = Math.sign(index - prev.index);
+        const out = fit(prev.index, box);
+        const { tx, s: sOut } = live ?? { tx: 0, s: 1 };
+        // incoming starts at the outgoing photo's (visible) height, never bigger than its own size
+        const s0 = Math.min(1, Math.max(0.6, (out.h * sOut) / to.h));
+        const outEnd = -dir * (to.w / 2 + SLIDE_GAP + (out.w * sOut) / 2);
+        const inStart = tx + dir * ((out.w * sOut) / 2 + SLIDE_GAP + (to.w * s0) / 2);
+        // incoming = the mask itself; outgoing = .pv__slideOut copies (animated in the effect below)
+        maskAnim.current = el.animate(
+          [{ transform: `translateX(${inStart}px) scale(${s0})` }, { transform: 'none' }],
+          { duration: SLIDE_MS, easing: SLIDE_EASE },
+        );
+        const T = (x: number, k: number) => `translateX(${x}px) scale(${k})`;
+        const delta = outEnd - tx;
+        const reach = (frame.current?.clientWidth ?? innerWidth) / 2 + 900;
+        const still = [...(frame.current?.querySelectorAll<HTMLElement>('.pv__slideOut') ?? [])]
+          .map((n) => ({ index: Number(n.dataset.index), m: new DOMMatrixReadOnly(getComputedStyle(n).transform) }))
+          .filter(({ m }) => Math.abs(m.e) < reach && Math.abs(m.e + delta) < reach * 2);
+        setLeavers([
+          ...still.map(({ index: i, m }) => ({ id: ++leaverId.current, index: i, from: T(m.e, m.a), to: T(m.e + delta, m.a) })),
+          { id: ++leaverId.current, index: prev.index, from: T(tx, sOut), to: T(outEnd, sOut) },
+        ]);
+      } else setLeavers([]);
+      setLeaving(null);
+      const t = setTimeout(() => setLeavers([]), SLIDE_MS);
+      return () => clearTimeout(t);
+    }
+
+    if (el && from && to && !reduce) {
       maskAnim.current?.cancel();
       // breathe in slightly (same shape as now), then open/reshape into the next photo's exact size.
       // Only dip further when the next photo is smaller in *both* directions, so the expand still reads as an expand.
@@ -199,6 +245,14 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     const t = setTimeout(() => setLeaving(null), SWAP_MS);
     return () => clearTimeout(t);
   }, [index, mode, open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // slide variant: send the outgoing photo(s) off along the strip
+  useLayoutEffect(() => {
+    for (const l of leavers) {
+      const n = frame.current?.querySelector<HTMLElement>(`[data-leaver="${l.id}"]`);
+      n?.animate([{ transform: l.from }, { transform: l.to }], { duration: SLIDE_MS, easing: SLIDE_EASE, fill: 'forwards' });
+    }
+  }, [leavers]);
 
   // keyboard
   useEffect(() => {
@@ -275,14 +329,26 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
               <button type="button" className="pv__arrow pv__arrow--prev" aria-label="Previous photo" disabled={index === 0} onClick={() => step(index - 1)}>
                 <IconArrow dir="left" />
               </button>
-              <div ref={frame} className="pv__frame">
+              <div ref={frame} className="pv__frame" data-swap={swap}>
+                {swap === 'slide' && box && leavers.map((l) => (
+                  <div
+                    key={l.id}
+                    className="pv__slideOut"
+                    data-leaver={l.id}
+                    data-index={l.index}
+                    style={{ width: fit(l.index, box).w, height: fit(l.index, box).h, transform: l.from }}
+                    aria-hidden
+                  >
+                    <img src={photos[l.index].src} alt="" />
+                  </div>
+                ))}
                 {size && box && (
                   <div
                     ref={mask}
                     className="pv__mask"
                     style={{ width: size.w, height: size.h, visibility: hidePhoto ? 'hidden' : undefined }}
                   >
-                    {leaving !== null && photos[leaving] && (
+                    {swap === 'mask' && leaving !== null && photos[leaving] && (
                       <img
                         key={`out-${leaving}`}
                         className="pv__img pv__img--out"

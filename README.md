@@ -38,6 +38,7 @@ To drop a component *inside* a fragment, have `scripts/extract.mjs` replace that
   - Data: `npm run fetch-photos` → `src/data/photoReviews.json`, with 80 photos from 46 reviews. It comes from noon's `mp-trust-api/product-reviews/sku/images-list` (paged with `page`).
 - **Variants widget** (`src/variants/`): a floating pill at the bottom left, available on every page and above the image view. Groups live in `VARIANT_GROUPS`:
   - Image view: White / Black.
+  - Next photo: Mask (default: the contract-then-expand mask) or Slide (from a reference recording): photos sit on a horizontal strip 24px apart; the current one slides off at its own size while the next comes in beside it, starting at the outgoing photo's height and growing to its fitted size (460ms, fast start/soft landing). A click mid-slide continues from the strip's live position, and photos still on screen keep moving with it. `?photoSwap=slide`.
   - View all tile: Blurred, where the 7th tile reads "View all (n)", or Gallery button, where the 7th photo stays sharp and a small frosted gallery button bottom-right opens the grid. The choice persists in localStorage and the URL (`?viewerTheme=black`).
 
 Not included: the sponsored ad strip above the breadcrumb, the cookie banner, and the hover mega-menus in the nav.

@@ -1,5 +1,5 @@
 import { photos, reviewsById } from './data';
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState } from 'react';
 
 const fmtDate = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -17,14 +17,37 @@ const isArabic = (s: string) => /[؀-ۿ]/.test(s);
  */
 export function ReviewPanel({ index }: { index: number }) {
   const reviewId = photos[index].review;
-  const review = reviewsById.get(reviewId)!;
+  // the review on screen plus (briefly) the one fading out; fast stepping only ever keeps the latest leaver
+  const [layers, setLayers] = useState([{ id: reviewId, out: false }]);
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    setLayers((ls) => {
+      const cur = ls.find((l) => !l.out);
+      if (cur?.id === reviewId) return ls;
+      return [...(cur ? [{ id: cur.id, out: true }] : []), { id: reviewId, out: false }];
+    });
+    if (scroller.current) scroller.current.scrollTop = 0;
+  }, [reviewId]);
 
   return (
     <aside className="pv__panel" aria-label="Review for this photo">
-      <div className="pv__panelScroll">
-        {/* keyed by review: content re-mounts (and fades in) only when the review changes */}
-        <ReviewBody key={reviewId} review={review} />
-
+      <div ref={scroller} className="pv__panelScroll">
+        <div className="pv__reviewStack">
+          {layers.map((l) => (
+            <div
+              key={l.id}
+              className="pv__reviewLayer"
+              data-state={l.out ? 'out' : 'in'}
+              aria-hidden={l.out || undefined}
+              onAnimationEnd={(e) => {
+                if (l.out && e.target === e.currentTarget) setLayers((ls) => ls.filter((x) => x !== l && !(x.out && x.id === l.id)));
+              }}
+            >
+              <ReviewBody review={reviewsById.get(l.id)!} />
+            </div>
+          ))}
+        </div>
       </div>
     </aside>
   );

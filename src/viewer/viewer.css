@@ -47,6 +47,8 @@
   --pv-avatar-bg: #eff3fd;
   --pv-avatar-fg: #9ba0b1;
   --pv-star-off: #dadce3;
+  --pv-btn: #f3f4f8;
+  --pv-btn-hover: #e7e9f0;
   --pv-rv-bold: #0e0e0e;
   --pv-rv-subtle: #404553;
   --pv-rv-muted: #7e859b;
@@ -71,6 +73,8 @@
   --pv-avatar-fg: rgba(255, 255, 255, 0.7);
   --pv-star-off: rgba(255, 255, 255, 0.2);
   /* Figma panel v3 tokens: on-surface-bold / -subtle / muted, alpha-light 16 / 8 */
+  --pv-btn: rgba(255, 255, 255, 0.12);
+  --pv-btn-hover: rgba(255, 255, 255, 0.18);
   --pv-rv-bold: #fff;
   --pv-rv-subtle: rgba(255, 255, 255, 0.8);
   --pv-rv-muted: #989fb3;
@@ -112,14 +116,14 @@
 }
 .pv__pip::before {
   content: '';
-  width: 6px;
-  height: 6px;
-  border-radius: 3px;
+  width: 4px;
+  height: 4px;
+  border-radius: 2px;
   background: var(--pv-fg);
   opacity: 0.28;
   transition: width 320ms cubic-bezier(0.22, 1, 0.36, 1), opacity 200ms ease;
 }
-.pv__pip[aria-current]::before { width: 20px; opacity: 1; }
+.pv__pip[aria-current]::before { width: 18px; opacity: 1; }
 @media (hover: hover) and (pointer: fine) { .pv__pip:not([aria-current]):hover::before { opacity: 0.56; } }
 .pv__pip:focus-visible { outline-offset: 0; border-radius: 6px; }
 .pv__close { grid-column: 2; justify-self: end; }
@@ -138,7 +142,7 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: transparent;
+  background: var(--pv-btn);
   color: var(--pv-fg) !important;
   cursor: pointer;
   transition: background-color 150ms ease, transform 150ms ease;
@@ -214,7 +218,7 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: transparent;
+  background: var(--pv-btn);
   color: var(--pv-fg) !important;
   cursor: pointer;
   transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
@@ -225,7 +229,7 @@
 .pv__arrow:disabled { color: var(--pv-disabled) !important; cursor: default; }
 
 @media (hover: hover) and (pointer: fine) {
-  .pv__icon:hover, .pv__arrow:not(:disabled):hover { background: var(--pv-hover); }
+  .pv__icon:hover, .pv__arrow:not(:disabled):hover { background: var(--pv-btn-hover); }
 }
 
 /* ---------- review panel ---------- */
@@ -247,9 +251,14 @@
   gap: 8px;
   font-family: Noontree, Cairo, 'Helvetica Neue', Arial, sans-serif;
   letter-spacing: -0.1px;
-  animation: pv-review-in 260ms cubic-bezier(0.23, 1, 0.32, 1);
 }
-@keyframes pv-review-in { from { opacity: 0; transform: translateY(6px); } }
+/* review swap: both layers share one grid cell; the old one fades out while the new one eases in */
+.pv__reviewStack { display: grid; }
+.pv__reviewLayer { grid-area: 1 / 1; min-width: 0; }
+.pv__reviewLayer[data-state='in'] { animation: pv-review-in 420ms cubic-bezier(0.22, 1, 0.36, 1) 90ms both; }
+.pv__reviewLayer[data-state='out'] { animation: pv-review-out 220ms cubic-bezier(0.4, 0, 1, 1) forwards; pointer-events: none; }
+@keyframes pv-review-in { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } }
+@keyframes pv-review-out { to { opacity: 0; transform: translateY(-3px); filter: blur(2px); } }
 
 /* Figma 5314:6655 "Review card" */
 .pv__ratingRow { display: flex; align-items: center; gap: 6px; }
@@ -339,7 +348,12 @@
   -webkit-mask: url('/viewer/thumbs-up.svg') center / 24px 24px no-repeat;
   mask: url('/viewer/thumbs-up.svg') center / 24px 24px no-repeat;
 }
-.pv__like[aria-pressed='true'] { background: var(--pv-rv-like-on); }
+.pv__like[aria-pressed='true'] .pv__likeIcon {
+  -webkit-mask-image: url('/viewer/thumbs-up-filled.svg');
+  mask-image: url('/viewer/thumbs-up-filled.svg');
+  animation: pv-like-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes pv-like-pop { 40% { scale: 1.18; } }
 .pv__likeCount { font-variant-numeric: tabular-nums; }
 @media (hover: hover) and (pointer: fine) { .pv__like:hover { background: var(--pv-rv-like-on); } }
 
@@ -373,5 +387,7 @@
   .pv__img--in { animation: pv-in-op 150ms ease-out both; }
   .pv__img--out { animation: pv-out-op 150ms ease-in forwards; }
   .pv__flyer { display: none; }
-  .pv__review { animation: pv-fade-in 150ms ease-out; }
+  .pv__reviewLayer[data-state='in'] { animation: pv-fade-in 150ms ease-out both; }
+  .pv__reviewLayer[data-state='out'] { animation: pv-fade-out 120ms ease-out forwards; }
+  .pv__like .pv__likeIcon { animation: none; }
 }

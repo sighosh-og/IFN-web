@@ -46,4 +46,7 @@ Not included: the sponsored ad strip above the breadcrumb, the cookie banner, an
 
 ## Deploying to noonprototype.com
 
+Live: https://vivid-badger.noonprototype.com/ (app 89, deploy region europe-west1; it's deleted on 23 Jan 2027 unless extended). Only signed-in noon employees can open it. To redeploy, run `npm run package`, then upload the new zip from the app's Deploy tab.
+
+
 `npm run package` builds and writes `noon-web-pdp-deploy.zip`, which has `Dockerfile`, `nginx.conf.template` and `dist/` at the top level. It serves the static build with nginx on `$PORT`, per the platform contract (Cloud Run behind IAP). The zip is a build artifact and is gitignored. Deploy it through the `noon-prototype` MCP server: `register_app` → `create_source_upload` → PUT the zip → `finalize_source_upload` → `deploy_app`. You can also upload it on the site under New App.

@@ -30,12 +30,14 @@ To drop a component *inside* a fragment, have `scripts/extract.mjs` replace that
   A row of seven 4:5 tiles with 12px corners. The 7th tile is blurred and dimmed and reads "View all (n)".
   Tiles open the image view on that photo. "View all" opens the grid.
 - **Image view** (`src/viewer/`): layout and motion modelled on Airbnb's experience gallery.
-  - Photo mode: one large photo with 32px corners, edge arrows, "n of N", a grid toggle and close. Photos swap with a crossfade and a 1.04→1 scale settle. Keys: ← → Esc.
-  - Grid mode: 4-column masonry with 16px corners.
-  - Review panel, docked right: the review behind the photo, Read more, variant chips, Helpful, and previous/next review.
-  - Same-review photos: the panel stays still while you step through one review's photos. It shows a "Photo n of N from this review" thumbnail row. Grid tiles carry an n/N badge, and hovering a tile dims every tile from other reviews.
+  - Photo mode: one large photo with 32px corners, sized in JS to fit the stage at any window size. It has edge arrows, "n of N", a grid toggle and close. Photos are decoded before they swap, and the crossfade overlaps (incoming 1.03→1). Keys: ← → Esc.
+  - Grid mode: 4-column masonry with 16px corners, no badges and no hover.
+  - Shared-element morphs: strip tile → photo on open, photo → strip tile on close, photo ⇄ grid tile. A single flyer runs all of them (`Transit` in `PhotoViewer.tsx`).
+  - Review panel, docked right: the review behind the photo, Read more, variant chips and Helpful. A "Photo n of N from this review" thumbnail row links photos from the same review, and the panel stays still while you step within one review.
   - Photos in the captured review cards also open the view.
-  - Data: `npm run fetch-photos` → `src/data/photoReviews.json`, with 80 photos from 46 reviews. It comes from noon's `mp-trust-api/product-reviews/sku/images-list` (paged with `page`), the same endpoint the live strip uses.
-- **Variants widget** (`src/variants/`): a floating pill at the bottom left, available on every page and above the image view. Groups live in `VARIANT_GROUPS`; for now there's Image view: White / Black. The choice persists in localStorage and the URL (`?viewerTheme=black`).
+  - Data: `npm run fetch-photos` → `src/data/photoReviews.json`, with 80 photos from 46 reviews. It comes from noon's `mp-trust-api/product-reviews/sku/images-list` (paged with `page`).
+- **Variants widget** (`src/variants/`): a floating pill at the bottom left, available on every page and above the image view. Groups live in `VARIANT_GROUPS`:
+  - Image view: White / Black.
+  - View all tile: Blurred, where the 7th tile reads "View all (n)", or Gallery button, where the 7th photo stays sharp and a small frosted gallery button bottom-right opens the grid. The choice persists in localStorage and the URL (`?viewerTheme=black`).
 
 Not included: the sponsored ad strip above the breadcrumb, the cookie banner, and the hover mega-menus in the nav.

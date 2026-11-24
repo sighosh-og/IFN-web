@@ -13,6 +13,14 @@ export const VARIANT_GROUPS = {
     ],
     default: 'white',
   },
+  viewAllTile: {
+    label: 'View all tile',
+    options: [
+      { value: 'blur', label: 'Blurred' },
+      { value: 'button', label: 'Gallery button' },
+    ],
+    default: 'blur',
+  },
 } as const;
 
 type Groups = typeof VARIANT_GROUPS;

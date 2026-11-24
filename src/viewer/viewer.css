@@ -11,10 +11,24 @@
   font-family: Noontree, 'Helvetica Neue', Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   outline: none;
-  animation: pv-fade-in 200ms ease-out;
+  animation: pv-fade-in 300ms cubic-bezier(0.32, 0.72, 0, 1);
   transition: background-color 200ms ease, color 200ms ease;
 }
-.pv[data-closing] { animation: pv-fade-out 180ms ease-in forwards; }
+.pv[data-closing] { animation: pv-fade-out 300ms cubic-bezier(0.32, 0.72, 0, 1) forwards; pointer-events: none; }
+
+/* photo mode and grid mode are layers so they can crossfade while the shared photo flies between them */
+.pv__layer { position: absolute; inset: 0; animation: pv-fade-in 260ms ease-out; }
+.pv__layer[data-leaving] { animation: pv-fade-out 260ms ease-out forwards; pointer-events: none; }
+
+/* the shared-element copy that flies between tile and photo */
+.pv__flyer {
+  position: fixed;
+  z-index: 1001;
+  overflow: hidden;
+  pointer-events: none;
+  will-change: left, top, width, height, border-radius;
+}
+.pv__flyer img { display: block; width: 100%; height: 100%; object-fit: cover; }
 @keyframes pv-fade-in { from { opacity: 0; } }
 @keyframes pv-fade-out { to { opacity: 0; } }
 
@@ -98,8 +112,6 @@
   display: grid;
   grid-template-columns: 1fr var(--pv-panel);
   grid-template-rows: var(--pv-bar) 1fr;
-  height: 100%;
-  animation: pv-fade-in 150ms ease-out;
 }
 
 .pv__stage {
@@ -111,28 +123,31 @@
 }
 .pv__frame {
   display: grid;
-  grid-template: minmax(0, 1fr) / minmax(0, 1fr); /* definite tracks so the photo's max-height: 100% resolves */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr); /* its box is measured; the photo is sized from it in JS */
   place-items: center;
   width: 100%;
   height: 100%;
 }
 .pv__img {
   grid-area: 1 / 1;
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  display: block;
+  object-fit: cover;
   border-radius: 32px;
   background: var(--pv-skel);
   user-select: none;
   -webkit-user-drag: none;
 }
-/* Airbnb swap: outgoing fades fast while growing to 1.04; incoming fades in and settles 1.04 → 1 */
-.pv__img--in { animation: pv-in-op 150ms ease-out both, pv-in-scale 400ms cubic-bezier(0.2, 0, 0, 1) both; }
-.pv__img--out { animation: pv-out 150ms ease-in forwards; pointer-events: none; }
+/* Airbnb-style swap, softened: incoming (on top) fades in while settling 1.03 → 1;
+   outgoing fades a touch later and slower so the two always overlap — no see-through dip. */
+.pv__img--in {
+  position: relative;
+  z-index: 1;
+  animation: pv-in-op 300ms cubic-bezier(0.22, 1, 0.36, 1) both, pv-in-scale 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.pv__img--out { animation: pv-out 340ms cubic-bezier(0.22, 1, 0.36, 1) 60ms forwards; pointer-events: none; }
 @keyframes pv-in-op { from { opacity: 0; } }
-@keyframes pv-in-scale { from { transform: scale(1.04); } }
-@keyframes pv-out { to { opacity: 0; transform: scale(1.04); } }
+@keyframes pv-in-scale { from { transform: scale(1.03); } }
+@keyframes pv-out { to { opacity: 0; transform: scale(1.02); } }
 
 .pv__arrow {
   position: absolute;
@@ -278,35 +293,9 @@
 .pv__thumb[aria-current] { opacity: 1; outline-color: var(--pv-fg); }
 @media (hover: hover) and (pointer: fine) { .pv__thumb:hover { opacity: 1; } }
 
-.pv__panelFoot {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
-  padding: 0 16px;
-  border-top: 1px solid var(--pv-line);
-}
-.pv__reviewNav {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--pv-fg) !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  cursor: pointer;
-  transition: background-color 150ms ease, opacity 150ms ease;
-}
-.pv__reviewNav:disabled { opacity: 0.35; cursor: default; }
-@media (hover: hover) and (pointer: fine) { .pv__reviewNav:not(:disabled):hover { background: var(--pv-hover); } }
-.pv__reviewPos { font-size: 12px; color: var(--pv-muted); font-variant-numeric: tabular-nums; }
 
 /* ---------- grid mode ---------- */
-.pv__gridMode { display: flex; flex-direction: column; height: 100%; animation: pv-fade-in 150ms ease-out; }
+.pv__gridMode { display: flex; flex-direction: column; }
 .pv__gridMode .pv__bar { flex: none; }
 .pv__gridScroll { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 12px 24px; }
 .pv__grid { position: relative; }
@@ -320,29 +309,8 @@
   overflow: hidden;
   background: var(--pv-skel);
   cursor: pointer;
-  transition: opacity 200ms ease;
 }
-.pv__tile img { display: block; width: 100%; height: 100%; object-fit: cover; transition: filter 200ms ease; }
-.pv__tile[data-dim] { opacity: 0.28; }
-@media (hover: hover) and (pointer: fine) { .pv__tile:hover img { filter: brightness(0.92); } }
-.pv__badge {
-  position: absolute;
-  top: 10px;
-  left: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #fff;
-  font-size: 12px;
-  line-height: 14px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
+.pv__tile img { display: block; width: 100%; height: 100%; object-fit: cover; }
 
 @media (max-width: 1100px) {
   .pv { --pv-panel: 320px; }
@@ -352,5 +320,6 @@
 @media (prefers-reduced-motion: reduce) {
   .pv__img--in { animation: pv-in-op 150ms ease-out both; }
   .pv__img--out { animation: pv-fade-out 150ms ease-in forwards; }
+  .pv__flyer { display: none; }
   .pv__review { animation: pv-fade-in 150ms ease-out; }
 }

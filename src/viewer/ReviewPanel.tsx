@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { firstPhotoOf, photos, reviewOrder, reviewsById, siblingsOf } from './data';
-import { IconChevron, Stars } from './icons';
+import { photos, reviewsById, siblingsOf } from './data';
+import { Stars } from './icons';
 
 const fmtDate = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -14,9 +14,6 @@ export function ReviewPanel({ index, onIndex }: { index: number; onIndex: (i: nu
   const review = reviewsById.get(reviewId)!;
   const siblings = siblingsOf(index);
   const pos = siblings.findIndex((s) => s.index === index);
-  const r = reviewOrder.indexOf(reviewId);
-  const prevReview = reviewOrder[r - 1];
-  const nextReview = reviewOrder[r + 1];
 
   return (
     <aside className="pv__panel" aria-label="Review for this photo">
@@ -39,25 +36,13 @@ export function ReviewPanel({ index, onIndex }: { index: number; onIndex: (i: nu
                   aria-label={`Photo ${i + 1} of ${siblings.length} from this review`}
                   onClick={() => onIndex(s.index)}
                 >
-                  <img src={s.src} alt="" loading="lazy" />
+                  <img src={s.src} alt="" />
                 </button>
               ))}
             </div>
           </section>
         )}
       </div>
-
-      <footer className="pv__panelFoot">
-        <button type="button" className="pv__reviewNav" disabled={!prevReview} onClick={() => onIndex(firstPhotoOf(prevReview))}>
-          <IconChevron dir="left" /> Previous review
-        </button>
-        <span className="pv__reviewPos">
-          {r + 1} / {reviewOrder.length}
-        </span>
-        <button type="button" className="pv__reviewNav" disabled={!nextReview} onClick={() => onIndex(firstPhotoOf(nextReview))}>
-          Next review <IconChevron dir="right" />
-        </button>
-      </footer>
     </aside>
   );
 }
@@ -92,8 +77,8 @@ function ReviewBody({ review }: { review: NonNullable<ReturnType<typeof reviewsB
       </div>
 
       <Stars rating={review.rating} />
-      {review.title?.trim() && <h3 className="pv__title">{review.title}</h3>}
-      <p ref={comment} className="pv__comment" data-expanded={expanded || undefined}>
+      {review.title?.trim() && <h3 className="pv__title" dir="auto">{review.title}</h3>}
+      <p ref={comment} className="pv__comment" dir="auto" data-expanded={expanded || undefined}>
         {review.comment}
       </p>
       {(clamped || expanded) && (

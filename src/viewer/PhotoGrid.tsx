@@ -1,20 +1,26 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { photos, siblingsOf } from './data';
+import { photos } from './data';
 
 const GAP = 12; // Airbnb grid: 12px gutters, 16px tile radius
 
-/**
- * Airbnb-style masonry: each photo drops into the currently shortest column, keeping its own aspect ratio.
- * Photos from the same review are adjacent in the feed, carry an "n/N" badge, and hovering one
- * dims every tile that isn't from that review.
- */
-export function PhotoGrid({ current, onPick }: { current: number; onPick: (i: number) => void }) {
+type Props = {
+  current: number;
+  /** tile hidden while the shared-element flyer is standing in for it */
+  hiddenIndex: number | null;
+  onPick: (i: number, tile: HTMLElement) => void;
+  /** fires once tiles are positioned and the current one is scrolled into view */
+  onLaidOut: (grid: HTMLElement) => void;
+};
+
+/** Airbnb-style masonry: each photo drops into the currently shortest column, keeping its own aspect ratio. */
+export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut }: Props) {
+  const scroller = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
-  const [hoverReview, setHoverReview] = useState<string | null>(null);
 
   useLayoutEffect(() => {
     const el = box.current!;
+    setWidth(el.getBoundingClientRect().width); // synchronous first measure, so a morph can target a tile immediately
     const ro = new ResizeObserver(([e]) => setWidth(e.contentRect.width));
     ro.observe(el);
     return () => ro.disconnect();
@@ -35,46 +41,32 @@ export function PhotoGrid({ current, onPick }: { current: number; onPick: (i: nu
     return { items, height: Math.max(...heights) - GAP };
   }, [width, cols]);
 
-  // returning from photo mode: bring the photo you were on into view
+  // first layout: bring the photo you were on into view, then let the viewer start its morph
+  const ready = layout.items.length > 0;
   useLayoutEffect(() => {
+    if (!ready) return;
     const it = layout.items[current];
-    const scroller = box.current?.closest('.pv__gridScroll');
-    if (it && scroller) scroller.scrollTop = Math.max(0, it.y - (scroller.clientHeight - it.h) / 2);
-  }, [layout.items.length > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+    const s = scroller.current!;
+    if (it) s.scrollTop = Math.max(0, it.y + 16 - (s.clientHeight - it.h) / 2);
+    onLaidOut(box.current!);
+  }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="pv__gridScroll">
-      <div ref={box} className="pv__grid" style={{ height: layout.height }} onPointerLeave={() => setHoverReview(null)}>
-        {layout.items.map(({ i, x, y, w, h }) => {
-          const p = photos[i];
-          const sib = siblingsOf(i);
-          const n = sib.findIndex((s) => s.index === i) + 1;
-          return (
-            <button
-              key={p.src}
-              type="button"
-              className="pv__tile"
-              style={{ transform: `translate(${x}px, ${y}px)`, width: w, height: h }}
-              data-dim={(hoverReview && hoverReview !== p.review) || undefined}
-              data-current={i === current || undefined}
-              aria-label={`Open photo ${i + 1}${sib.length > 1 ? `, ${n} of ${sib.length} from one review` : ''}`}
-              onPointerEnter={() => setHoverReview(p.review)}
-              onFocus={() => setHoverReview(p.review)}
-              onClick={() => onPick(i)}
-            >
-              <img src={p.src} alt="" loading="lazy" />
-              {sib.length > 1 && (
-                <span className="pv__badge" aria-hidden>
-                  <svg width="12" height="12" viewBox="0 0 16 16">
-                    <rect x="4.5" y="1.5" width="10" height="10" rx="2.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M1.5 5v7a2.5 2.5 0 0 0 2.5 2.5h7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                  {n}/{sib.length}
-                </span>
-              )}
-            </button>
-          );
-        })}
+    <div ref={scroller} className="pv__gridScroll">
+      <div ref={box} className="pv__grid" style={{ height: layout.height }}>
+        {layout.items.map(({ i, x, y, w, h }) => (
+          <button
+            key={photos[i].src}
+            type="button"
+            className="pv__tile"
+            data-index={i}
+            style={{ transform: `translate(${x}px, ${y}px)`, width: w, height: h, visibility: hiddenIndex === i ? 'hidden' : undefined }}
+            aria-label={`Open photo ${i + 1} of ${photos.length}`}
+            onClick={(e) => onPick(i, e.currentTarget)}
+          >
+            <img src={photos[i].src} alt="" loading={Math.abs(i - current) < 16 ? 'eager' : 'lazy'} />
+          </button>
+        ))}
       </div>
     </div>
   );

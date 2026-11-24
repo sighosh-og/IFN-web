@@ -44,7 +44,7 @@ export function wireInteractions() {
     const img = (e.target as Element).closest('#ReviewArea img') as HTMLImageElement | null;
     if (!img || img.closest('.cp') || !/\/review\//.test(img.src)) return;
     e.preventDefault();
-    window.dispatchEvent(new CustomEvent('pdp:open-photo', { detail: { src: img.src } }));
+    window.dispatchEvent(new CustomEvent('pdp:open-photo', { detail: { src: img.src, el: img } }));
   });
 
   // ---- Generic translate-based sliders (recommendations, customer photos) ----

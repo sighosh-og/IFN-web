@@ -315,7 +315,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
               </button>
             </header>
 
-            <div className="pv__stage" onWheel={onWheel}>
+            <div className="pv__stage" onWheel={onWheel} data-thumbs={reviewPhotos === 'thumbs' || undefined}>
               <button type="button" className="pv__arrow pv__arrow--prev" aria-label="Previous photo" disabled={index === 0} onClick={() => step(index - 1)}>
                 <IconArrow dir="left" />
               </button>

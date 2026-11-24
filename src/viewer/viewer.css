@@ -183,12 +183,14 @@
   isolation: isolate;
   will-change: width, height;
 }
-/* "Bottom carousel" review-photos variant: sits in the stage's bottom band, under the photo */
+/* "Bottom carousel" review-photos variant: sits in the stage's bottom band, under the photo.
+   The band grows a little in this variant so there's a clear 24px gap between photo and thumbnails. */
+.pv__stage[data-thumbs] { padding-bottom: 100px; }
 .pv__thumbs {
   position: absolute;
   z-index: 2;
   left: 50%;
-  bottom: 12px;
+  bottom: 20px;
   translate: -50% 0;
   display: flex;
   gap: 8px;
@@ -201,8 +203,8 @@
 .pv__thumb {
   position: relative;
   flex: none;
-  width: 44px;
-  height: 56px;
+  width: 52px;
+  height: 52px; /* fixed 1:1 — every thumbnail the same square, photo cropped to fill */
   padding: 0;
   border: 0;
   border-radius: 8px;

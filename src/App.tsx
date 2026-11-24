@@ -11,6 +11,9 @@ import recos from './sections/recos.html?raw';
 import stickyBar from './sections/stickyBar.html?raw';
 import footer from './sections/footer.html?raw';
 import { wireInteractions } from './interactions';
+import { CustomerPhotos } from './features/CustomerPhotos';
+
+const reviewSlots = { 'customer-photos': <CustomerPhotos /> };
 
 // Page skeleton mirrors noon's DOM: #catalog-page-container > mainContainer > fullWrappers.
 // To build a feature, replace one <Html html={…}/> with a real React component.
@@ -37,7 +40,7 @@ export default function App() {
           <div id="sticky-bar-top-visibility-trigger" className={shell.stickyTrigger} />
           <div className={shell.reviewsWrap}>
             <div className={shell.reviewsSeparator} />
-            <Html html={reviews} />
+            <Html html={reviews} slots={reviewSlots} />
             <div className={shell.reviewsAfter} />
           </div>
           <div className={shell.recosWrap}>

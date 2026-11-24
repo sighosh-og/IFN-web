@@ -1,0 +1,75 @@
+/* Figma 5297:2221 — values mirror the design tokens (space/8,16,24; radius/12). */
+.cp {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 0;
+  border-top: 1px solid #f3f4f8;
+}
+
+.cp__title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 22.4px;
+  font-weight: 700;
+  color: #404553;
+}
+.cp__count { font-weight: inherit; }
+
+.cp__row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.cp__tile {
+  position: relative;
+  flex: 1 0 0;
+  min-width: 0;
+  aspect-ratio: 120 / 150;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f3f4f8;
+  cursor: pointer;
+  isolation: isolate;
+}
+.cp__tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.cp__tile:focus-visible { outline: 2px solid #3866df; outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) {
+  .cp__tile:hover img { transform: scale(1.04); }
+}
+
+/* "View all" tile: photo → 20% dim → 6px backdrop blur with alpha-dark/24 → label */
+.cp__tile--more img { filter: brightness(0.8); }
+.cp__scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.cp__moreLabel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: #fff;
+  font-family: Noontree, 'Helvetica Neue', Arial, sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 20px;
+  letter-spacing: -0.15px;
+  text-align: center;
+}

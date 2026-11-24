@@ -1,4 +1,5 @@
-import { createElement, memo, useMemo } from 'react';
+import { createElement, Fragment, memo, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 
 // Renders a captured noon HTML fragment as its own outer element (no extra wrapper div),
 // so noon's CSS and layout apply exactly as on the live page.
@@ -25,7 +26,30 @@ function parse(raw: string) {
   return { tag: el.tagName.toLowerCase(), props, inner: el.innerHTML };
 }
 
-export const Html = memo(function Html({ html, ...extra }: { html: string } & Record<string, unknown>) {
+type HtmlProps = {
+  html: string;
+  /** React content to mount into `<div data-slot="name">` placeholders inside the fragment. */
+  slots?: Record<string, ReactNode>;
+} & Record<string, unknown>;
+
+export const Html = memo(function Html({ html, slots, ...extra }: HtmlProps) {
   const { tag, props, inner } = useMemo(() => parse(html), [html]);
-  return createElement(tag, { ...props, ...extra, dangerouslySetInnerHTML: { __html: inner } });
+  const ref = useRef<HTMLElement>(null);
+  const [targets, setTargets] = useState<Record<string, HTMLElement>>({});
+  useLayoutEffect(() => {
+    if (!slots || !ref.current) return;
+    const found: Record<string, HTMLElement> = {};
+    for (const name of Object.keys(slots)) {
+      const el = ref.current.querySelector<HTMLElement>(`[data-slot="${name}"]`);
+      if (el) found[name] = el;
+      else console.warn(`<Html>: no [data-slot="${name}"] in fragment`);
+    }
+    setTargets(found);
+  }, [inner, slots && Object.keys(slots).join()]);
+  return createElement(
+    Fragment,
+    null,
+    createElement(tag, { ...props, ...extra, ref, dangerouslySetInnerHTML: { __html: inner } }),
+    slots && Object.entries(targets).map(([name, el]) => createPortal(slots[name], el, name)),
+  );
 });

@@ -22,5 +22,12 @@ npm run dev        # http://localhost:5211
 
 Swap the section you're changing for a real React component, e.g. replace `<Html html={core} />` with `<Core />`, and keep noon's class names so `noon.css` still styles it.
 Put local style changes in `src/overrides.css`.
+To drop a component *inside* a fragment, have `scripts/extract.mjs` replace that markup with `<div data-slot="name">`, then pass `slots={{ name: <Comp /> }}` to `<Html>`. The component renders into the placeholder through a portal.
+
+## Features
+
+- **Customer photos** ([src/features/CustomerPhotos.tsx](src/features/CustomerPhotos.tsx)) — Figma `Image-first-navigation` node `5297:2221` (reference image in `capture/figma-customer-photos.png`).
+  A row of seven 4:5 tiles with 12px corners. The 7th tile is blurred and dimmed and reads "View all (n)".
+  The photos are the real review photos for this SKU (`src/data/customerPhotos.json`, 20 of 1,537), pulled from the live strip by `npm run extract`.
 
 Not included: the sponsored ad strip above the breadcrumb, the cookie banner, and the hover mega-menus in the nav.

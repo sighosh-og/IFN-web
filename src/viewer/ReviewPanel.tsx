@@ -1,13 +1,19 @@
-import { useLayoutEffect, useRef, useState } from 'react';
 import { photos, reviewsById, siblingsOf } from './data';
-import { Stars } from './icons';
+import { useState } from 'react';
 
 const fmtDate = (iso: string) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
+// Rating pill fill (Figma "Ratings": green/700 for 5★); lower ratings keep noon's review-star colours.
+const PILL: Record<number, string> = { 5: '#0f8857', 4: '#0f8857', 3: '#05af25', 2: '#f8b200', 1: '#f36302' };
+// "silver" → "Silver", but leave "iPhone" / "eSIM" alone
+const cap = (s: string) => (/^[a-z][a-z]/.test(s) ? s[0].toUpperCase() + s.slice(1) : s);
+const isArabic = (s: string) => /[؀-ۿ]/.test(s);
+
 /**
- * The review behind the current photo. Stepping through photos of the same review keeps this panel still
- * (only the "photos from this review" thumbnail ring moves); crossing into another review swaps the content.
+ * The review behind the current photo (Figma 5314:6610 "Sidebar - Review for this photo").
+ * Stepping through photos of the same review keeps this panel still (only the "photos from this review"
+ * thumbnail ring moves); crossing into another review swaps the content.
  */
 export function ReviewPanel({ index, onIndex }: { index: number; onIndex: (i: number) => void }) {
   const reviewId = photos[index].review;
@@ -48,66 +54,63 @@ export function ReviewPanel({ index, onIndex }: { index: number; onIndex: (i: nu
 }
 
 function ReviewBody({ review }: { review: NonNullable<ReturnType<typeof reviewsById.get>> }) {
-  const [expanded, setExpanded] = useState(false);
-  const [clamped, setClamped] = useState(false);
-  const [helpful, setHelpful] = useState(false);
-  const comment = useRef<HTMLParagraphElement>(null);
-
-  useLayoutEffect(() => {
-    const el = comment.current;
-    if (el) setClamped(el.scrollHeight > el.clientHeight + 1);
-  }, []);
+  const [liked, setLiked] = useState(false);
 
   return (
-    <div className="pv__review">
-      <div className="pv__reviewer">
-        <span className="pv__avatar" aria-hidden>{review.name.trim()[0]}</span>
-        <div className="pv__reviewerText">
-          <div className="pv__reviewerTop">
-            <span className="pv__name">{review.name}</span>
-            {review.verified && (
-              <span className="pv__verified">
-                <img src="https://f.nooncdn.com/s/app/com/noon/icons/verified-purchase.svg" alt="" width="13" height="13" />
-                Verified Purchase
+    <article className="pv__review">
+      <div className="pv__ratingRow">
+        <span className="pv__rating" style={{ background: PILL[review.rating] }} aria-label={`${review.rating} out of 5 stars`}>
+          {review.rating}
+          <img src="/viewer/star.svg" alt="" width="12" height="12" />
+        </span>
+        {review.verified && (
+          <>
+            <span className="pv__dot" aria-hidden>•</span>
+            <span className="pv__verified">
+              <span className="pv__verifiedIcon" aria-hidden>
+                <img src="/viewer/verified-buy.svg" alt="" width="16" height="16" />
               </span>
-            )}
-          </div>
-          <span className="pv__date">{fmtDate(review.date)}</span>
-        </div>
+              Verified Buy
+            </span>
+          </>
+        )}
       </div>
 
-      <Stars rating={review.rating} />
-      {review.title?.trim() && <h3 className="pv__title" dir="auto">{review.title}</h3>}
-      <p ref={comment} className="pv__comment" dir="auto" data-expanded={expanded || undefined}>
-        {review.comment}
-      </p>
-      {(clamped || expanded) && (
-        <button type="button" className="pv__more" onClick={() => setExpanded((e) => !e)}>
-          {expanded ? 'Show less' : 'Read more'}
-        </button>
+      <div className="pv__body">
+        {review.title?.trim() && <h3 className="pv__title" dir="auto">{review.title}</h3>}
+        <p className="pv__comment" dir="auto">{review.comment}</p>
+      </div>
+
+      {review.variants.length > 0 && (
+        <ul className="pv__specs" aria-label="Purchased variant">
+          {review.variants.map((v) => (
+            <li key={v.label} className="pv__spec" title={v.label}>{cap(v.value)}</li>
+          ))}
+        </ul>
+      )}
+      {isArabic(review.comment) && (
+        <button type="button" className="pv__translate">See Translation (English)</button>
       )}
 
-      <dl className="pv__variants">
-        {review.variants.map((v) => (
-          <div key={v.label} className="pv__variant">
-            <dt>{v.label}</dt>
-            <dd>{v.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <div className="pv__divider" aria-hidden />
 
-      <button type="button" className="pv__helpful" aria-pressed={helpful} onClick={() => setHelpful((h) => !h)}>
-        <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-          <path
-            d="M7 10v11M3 11.5v8A1.5 1.5 0 0 0 4.5 21H17a2 2 0 0 0 2-1.6l1.4-7A2 2 0 0 0 18.4 10H14V5.5A2.5 2.5 0 0 0 11.5 3L7 10"
-            fill={helpful ? 'currentColor' : 'none'}
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-          />
-        </svg>
-        Helpful ({review.helpful + (helpful ? 1 : 0)})
-      </button>
-    </div>
+      <footer className="pv__byline">
+        <div className="pv__who">
+          <span className="pv__name">{review.name}</span>
+          <span className="pv__dot" aria-hidden>•</span>
+          <span className="pv__date">{fmtDate(review.date)}</span>
+        </div>
+        <button
+          type="button"
+          className="pv__like"
+          aria-pressed={liked}
+          aria-label={`Helpful, ${review.helpful + (liked ? 1 : 0)}`}
+          onClick={() => setLiked((l) => !l)}
+        >
+          <span className="pv__likeIcon" aria-hidden />
+          <span className="pv__likeCount">{review.helpful + (liked ? 1 : 0)}</span>
+        </button>
+      </footer>
+    </article>
   );
 }

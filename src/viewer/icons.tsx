@@ -28,16 +28,3 @@ export const IconChevron = ({ dir }: { dir: 'left' | 'right' }) => (
     <path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
-
-// noon's rating colours (Figma review bars): 5/4 green, 3 light green, 2 amber, 1 orange
-const STAR_COLOUR: Record<number, string> = { 5: '#006300', 4: '#006300', 3: '#05af25', 2: '#f8b200', 1: '#f36302' };
-
-export const Stars = ({ rating }: { rating: number }) => (
-  <div className="pv__stars" role="img" aria-label={`${rating} out of 5 stars`} style={{ ['--star' as string]: STAR_COLOUR[rating] }}>
-    {[1, 2, 3, 4, 5].map((n) => (
-      <svg key={n} width="16" height="16" viewBox="0 0 24 24" data-on={n <= rating || undefined}>
-        <path d="M12 2.5l2.9 6.1 6.6.8-4.9 4.6 1.3 6.6L12 17.3l-5.9 3.3 1.3-6.6L2.5 9.4l6.6-.8z" />
-      </svg>
-    ))}
-  </div>
-);

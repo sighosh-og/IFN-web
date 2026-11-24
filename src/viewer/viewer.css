@@ -381,6 +381,33 @@
 }
 
 .pv__byline { display: flex; align-items: center; gap: 12px; }
+
+/* "Top, by close" reviewer variant: avatar + name/date in the panel's top band, centred on the close button */
+.pv__panel { position: relative; }
+.pv__panelHead {
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 80px; /* clear of the 48px close button at 16px */
+  height: var(--pv-bar);
+  display: grid;
+  align-items: center;
+  font-family: Noontree, Cairo, 'Helvetica Neue', Arial, sans-serif;
+  letter-spacing: -0.1px;
+}
+.pv__panelHead > .pv__reviewLayer { grid-area: 1 / 1; }
+.pv__reviewer { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.pv__profile {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  background: var(--pv-rv-muted);
+  -webkit-mask: url('/viewer/user-circle.svg') center / 32px 32px no-repeat;
+  mask: url('/viewer/user-circle.svg') center / 32px 32px no-repeat;
+}
+.pv__reviewerText { display: flex; flex-direction: column; min-width: 0; }
+.pv__reviewerText .pv__name { white-space: nowrap; }
+.pv__reviewerText .pv__date { font-size: 12px; line-height: 18px; color: var(--pv-rv-muted); }
 .pv__who { display: flex; flex: 1; align-items: center; gap: 4px; min-width: 0; white-space: nowrap; }
 .pv__name { overflow: hidden; text-overflow: ellipsis; font-size: 14px; line-height: 20px; font-weight: 600; color: var(--pv-rv-bold); }
 .pv__date { font-size: 14px; line-height: 20px; color: var(--pv-rv-subtle); }

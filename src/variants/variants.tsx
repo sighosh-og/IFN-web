@@ -38,6 +38,14 @@ export const VARIANT_GROUPS = {
     ],
     default: 'dots',
   },
+  reviewer: {
+    label: 'Reviewer',
+    options: [
+      { value: 'bottom', label: 'Bottom' },
+      { value: 'top', label: 'Top, by close' },
+    ],
+    default: 'bottom',
+  },
 } as const;
 
 type Groups = typeof VARIANT_GROUPS;

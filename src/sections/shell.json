@@ -1,0 +1,22 @@
+{
+  "html": {
+    "lang": "en-AE",
+    "dir": "ltr",
+    "data-commit": "247f3",
+    "data-version": "4.1.48-hotfix-hide-quick-filters"
+  },
+  "main": "siteWidthContainer",
+  "mainInner": "_mainContainer_12kg6_1 _noGap_12kg6_22",
+  "topWrap": "_fullWrapper_12kg6_25 _noGap_12kg6_22",
+  "breadcrumbWrap": "_maxWrapper_12kg6_41",
+  "productWrap": "_maxWrapper_12kg6_41",
+  "middle": "_middleSection_12kg6_83",
+  "primary": "_primaryDetails_12kg6_91",
+  "separator": "_sectionSeparator_12kg6_11",
+  "stickyTrigger": "_stickyBarTopTrigger_12kg6_217",
+  "reviewsWrap": "_fullWrapper_12kg6_25 _noGap_12kg6_22",
+  "reviewsSeparator": "_sectionSeparator_12kg6_11",
+  "reviewsAfter": "_maxWrapper_12kg6_41",
+  "recosWrap": "_fullWrapper_12kg6_25 _recosCtr_12kg6_35 _noGap_12kg6_22",
+  "scrollTop": "<button class=\"_scrollTopButtonCtr_qmh9y_1 _scollToTopCtr_12kg6_224\" type=\"button\" aria-label=\"Scroll to top\"><img src=\"https://f.nooncdn.com/s/app/com/noon/icons/arrow-up-white.svg\" alt=\"Scroll to top\" width=\"20\" height=\"20\" style=\"width:20px;height:20px\" loading=\"eager\"></button>"
+}

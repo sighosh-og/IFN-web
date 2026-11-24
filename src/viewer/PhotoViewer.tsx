@@ -33,9 +33,18 @@ const FLY_MS = 460;
 const FLY_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft landing
 // Photo → photo: one rounded mask holds the photos. It contracts (keeping the current shape), then expands
 // into the next photo's exact width × height while the photos crossfade inside it.
+// Two layers, so the motion stays continuous however different the two photos' shapes are:
+//  - shape: width × height morph on ONE curve (a short hold, then a soft ease) — no mid-way speed jump;
+//  - breath: a separate subtle scale dip (1 → BREATH → 1) — the "contract, then open" feel.
+// Both photos fill the mask (object-fit: cover) during the morph, so no empty band ever shows,
+// even portrait ↔ landscape. Big aspect changes get a little more time (up to +SWAP_EXTRA ms).
 const SWAP_MS = 520;
-const CONTRACT_AT = 0.36; // share of SWAP_MS spent contracting
-const CONTRACT = 0.96; // how far the mask closes (relative to the smaller of the two photos) — kept subtle
+const SWAP_EXTRA = 180;
+const SHAPE_HOLD = 0.12; // share of the swap before the shape starts to change (the breath leads)
+const SHAPE_EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
+const BREATH = 0.965;
+const BREATH_AT = 0.32;
+const SINE = 'cubic-bezier(0.37, 0, 0.63, 1)';
 const PHOTO_R = 32; // Airbnb viewer radius
 const TILE_R = 16; // Airbnb grid radius
 
@@ -71,8 +80,8 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   const sheet = useRef<HTMLDivElement>(null);
   const frame = useRef<HTMLDivElement>(null);
   const mask = useRef<HTMLDivElement>(null);
-  const maskFrom = useRef<{ w: number; h: number } | null>(null);
   const maskAnim = useRef<Animation | null>(null);
+  const breathAnim = useRef<Animation | null>(null);
   const flyer = useRef<HTMLDivElement>(null);
   const focusBack = useRef<Element | null>(null);
 
@@ -175,9 +184,6 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     img.src = photos[i].src;
     Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 350))]).then(() => {
       if (token !== stepToken.current) return;
-      // the mask's live size (mid-animation if the user is clicking fast) is where the next morph starts
-      const r = mask.current?.getBoundingClientRect();
-      maskFrom.current = r ? { w: r.width, h: r.height } : null;
       onIndex(i);
     });
   };
@@ -196,28 +202,40 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     setLeaving(prev.index);
 
     const el = mask.current;
-    const from = maskFrom.current;
     const to = box ? fit(index, box) : null;
-    maskFrom.current = null;
+    // start from where the mask really is: mid-morph on a fast click (layout size, before the breath's scale),
+    // otherwise the previous photo's fitted size (the inline style already shows the new one)
+    const morphing = maskAnim.current?.playState === 'running';
+    const from = el && box ? (morphing ? { w: el.offsetWidth, h: el.offsetHeight } : fit(prev.index, box)) : null;
+    const s0 = el && breathAnim.current?.playState === 'running' ? parseFloat(getComputedStyle(el).scale) || 1 : 1;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
     if (swap === 'slide') { setLeaving(null); return; } // SlideStrip animates itself
 
+    const aspectJump = from && to ? Math.abs(Math.log(to.w / to.h / (from.w / from.h))) : 0; // 0 same shape … ~0.9 portrait↔landscape
+    const dur = Math.round(SWAP_MS + Math.min(SWAP_EXTRA, aspectJump * 220));
     if (el && from && to && !reduce) {
       maskAnim.current?.cancel();
-      // breathe in slightly (same shape as now), then open/reshape into the next photo's exact size.
-      // Only dip further when the next photo is smaller in *both* directions, so the expand still reads as an expand.
-      const k = CONTRACT * Math.min(1, Math.max(to.w / from.w, to.h / from.h));
+      breathAnim.current?.cancel();
+      el.style.setProperty('--pv-swap', `${dur}ms`);
       maskAnim.current = el.animate(
         [
-          { width: `${from.w}px`, height: `${from.h}px`, easing: 'cubic-bezier(0.45, 0, 0.55, 1)' },
-          { width: `${from.w * k}px`, height: `${from.h * k}px`, offset: CONTRACT_AT, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+          { width: `${from.w}px`, height: `${from.h}px` },
+          { width: `${from.w}px`, height: `${from.h}px`, offset: SHAPE_HOLD, easing: SHAPE_EASE },
           { width: `${to.w}px`, height: `${to.h}px` },
         ],
-        { duration: SWAP_MS },
+        { duration: dur },
+      );
+      breathAnim.current = el.animate(
+        [
+          { scale: String(s0), easing: SINE },
+          { scale: String(BREATH), offset: BREATH_AT, easing: SINE },
+          { scale: '1' },
+        ],
+        { duration: dur },
       );
     }
-    const t = setTimeout(() => setLeaving(null), SWAP_MS);
+    const t = setTimeout(() => setLeaving(null), dur);
     return () => clearTimeout(t);
   }, [index, mode, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -342,7 +360,6 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
                         key={`out-${leaving}`}
                         className="pv__img pv__img--out"
                         src={photos[leaving].src}
-                        style={{ width: fit(leaving, box).w, height: fit(leaving, box).h }}
                         alt=""
                         aria-hidden
                       />
@@ -351,7 +368,6 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
                       key={`in-${index}`}
                       className="pv__img pv__img--in"
                       src={photo.src}
-                      style={{ width: size.w, height: size.h }}
                       alt={`Customer photo ${index + 1}`}
                     />
                   </div>

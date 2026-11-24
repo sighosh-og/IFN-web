@@ -237,28 +237,31 @@
 .pv__strip[data-moving] .pv__slideCard, .pv__strip[data-moving] .pv__slideCard img { will-change: left, top, width, height; }
 
 /* photos keep their own fitted size, centred; the mask decides how much of them shows */
+/* both photos fill the mask (cover): at rest the mask IS the photo's fitted size, so nothing is cropped;
+   mid-morph neither photo leaves an empty band, even portrait ↔ landscape */
 .pv__img {
   position: absolute;
-  left: 50%;
-  top: 50%;
-  translate: -50% -50%;
+  inset: 0;
   display: block;
+  width: 100%;
+  height: 100%;
   max-width: none;
+  object-fit: cover;
   user-select: none;
   -webkit-user-drag: none;
 }
-/* timed to the mask (520ms, contract ≈ 0–190ms, expand ≈ 190–520ms) — deliberately subtle */
+/* timed against the mask morph (--pv-swap, 520–700ms): out hands over early, in settles with the shape */
 .pv__img--out {
   animation:
-    pv-out-scale 190ms cubic-bezier(0.45, 0, 0.55, 1) forwards,
-    pv-out-op 200ms ease-out 130ms forwards;
+    pv-out-scale 260ms cubic-bezier(0.37, 0, 0.63, 1) forwards,
+    pv-out-op calc(var(--pv-swap, 520ms) * 0.4) cubic-bezier(0.4, 0, 1, 1) calc(var(--pv-swap, 520ms) * 0.18) forwards;
   pointer-events: none;
 }
 .pv__img--in {
   z-index: 1;
   animation:
-    pv-in-op 240ms ease-out 140ms both,
-    pv-in-scale 380ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
+    pv-in-op calc(var(--pv-swap, 520ms) * 0.45) cubic-bezier(0, 0, 0.2, 1) calc(var(--pv-swap, 520ms) * 0.14) both,
+    pv-in-scale calc(var(--pv-swap, 520ms) * 0.86) cubic-bezier(0.22, 1, 0.36, 1) calc(var(--pv-swap, 520ms) * 0.14) both;
 }
 @keyframes pv-out-scale { to { scale: 0.98; } }
 @keyframes pv-out-op { to { opacity: 0; } }

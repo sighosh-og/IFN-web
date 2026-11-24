@@ -1,4 +1,4 @@
-import { photos, reviewsById, siblingsOf } from './data';
+import { photos, reviewsById } from './data';
 import { useState } from 'react';
 
 const fmtDate = (iso: string) =>
@@ -12,14 +12,12 @@ const isArabic = (s: string) => /[؀-ۿ]/.test(s);
 
 /**
  * The review behind the current photo (Figma 5314:6610 "Sidebar - Review for this photo").
- * Stepping through photos of the same review keeps this panel still (only the "photos from this review"
- * thumbnail ring moves); crossing into another review swaps the content.
+ * Stepping through photos of the same review keeps this panel still (the top-bar dots show where you are
+ * in the review); crossing into another review swaps the content.
  */
-export function ReviewPanel({ index, onIndex }: { index: number; onIndex: (i: number) => void }) {
+export function ReviewPanel({ index }: { index: number }) {
   const reviewId = photos[index].review;
   const review = reviewsById.get(reviewId)!;
-  const siblings = siblingsOf(index);
-  const pos = siblings.findIndex((s) => s.index === index);
 
   return (
     <aside className="pv__panel" aria-label="Review for this photo">
@@ -27,27 +25,6 @@ export function ReviewPanel({ index, onIndex }: { index: number; onIndex: (i: nu
         {/* keyed by review: content re-mounts (and fades in) only when the review changes */}
         <ReviewBody key={reviewId} review={review} />
 
-        {siblings.length > 1 && (
-          <section className="pv__siblings" aria-label="Photos from this review">
-            <div className="pv__siblingsLabel">
-              Photo {pos + 1} of {siblings.length} from this review
-            </div>
-            <div className="pv__siblingsRow">
-              {siblings.map((s, i) => (
-                <button
-                  key={s.src}
-                  type="button"
-                  className="pv__thumb"
-                  aria-current={s.index === index || undefined}
-                  aria-label={`Photo ${i + 1} of ${siblings.length} from this review`}
-                  onClick={() => onIndex(s.index)}
-                >
-                  <img src={s.src} alt="" />
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
       </div>
     </aside>
   );

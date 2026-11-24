@@ -3,6 +3,7 @@ import { useVariant } from '../variants/variants';
 import { photos, totalPhotos } from './data';
 import { ReviewPanel } from './ReviewPanel';
 import { PhotoGrid } from './PhotoGrid';
+import { ReviewDots } from './ReviewDots';
 import { IconArrow, IconClose, IconGrid } from './icons';
 import type { ViewerMode } from './ViewerContext';
 import './viewer.css';
@@ -264,9 +265,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
               <button type="button" className="pv__icon" aria-label="Show all photos" onClick={toGrid}>
                 <IconGrid />
               </button>
-              <div className="pv__counter" aria-live="polite">
-                {index + 1} of {photos.length}
-              </div>
+              <ReviewDots index={index} onIndex={step} />
               <button type="button" className="pv__icon pv__close" aria-label="Close" onClick={onClose}>
                 <IconClose />
               </button>
@@ -308,7 +307,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
               </button>
             </div>
 
-            <ReviewPanel index={index} onIndex={step} />
+            <ReviewPanel index={index} />
           </div>
         )}
 

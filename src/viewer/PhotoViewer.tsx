@@ -162,10 +162,15 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   // ---------- photo ↔ photo ----------
   // preload + decode before swapping so the mask never opens onto an empty frame
   const stepToken = useRef(0);
+  // where a step still waiting on decode is headed — relative moves count from here, so fast presses add up
+  const pending = useRef<number | null>(null);
+  useEffect(() => { if (pending.current === index) pending.current = null; }, [index]);
+  useEffect(() => { pending.current = null; stepToken.current++; }, [open, mode]); // a closed/switched viewer forgets queued steps
   const step = (i: number) => {
-    if (i < 0 || i >= photos.length || i === index) return;
+    if (i < 0 || i >= photos.length || i === (pending.current ?? index)) return;
     const token = ++stepToken.current;
     if (swap === 'slide') return onIndex(i); // the spring starts at once; neighbours are already preloaded
+    pending.current = i;
     const img = new Image();
     img.src = photos[i].src;
     Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 350))]).then(() => {
@@ -176,6 +181,9 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
       onIndex(i);
     });
   };
+
+  /** relative move (arrows, keys, swipe) — counts from a step still in flight */
+  const move = (delta: number) => step((pending.current ?? index) + delta);
 
   const [leaving, setLeaving] = useState<number | null>(null);
   const last = useRef({ index, mode, open });
@@ -231,8 +239,8 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
         if (e.shiftKey && (!inside || at === first)) { e.preventDefault(); lastEl.focus(); }
         else if (!e.shiftKey && (!inside || at === lastEl)) { e.preventDefault(); first.focus(); }
       }
-      else if (mode === 'photo' && e.key === 'ArrowRight') { e.preventDefault(); step(index + 1); }
-      else if (mode === 'photo' && e.key === 'ArrowLeft') { e.preventDefault(); step(index - 1); }
+      else if (mode === 'photo' && e.key === 'ArrowRight') { e.preventDefault(); move(1); }
+      else if (mode === 'photo' && e.key === 'ArrowLeft') { e.preventDefault(); move(-1); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
@@ -249,7 +257,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     w.acc += e.deltaX;
     if (Math.abs(w.acc) > 60) {
       w.locked = true;
-      step(index + Math.sign(w.acc));
+      move(Math.sign(w.acc));
     }
   };
 
@@ -316,7 +324,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
             </header>
 
             <div className="pv__stage" onWheel={onWheel} data-thumbs={reviewPhotos === 'thumbs' || undefined}>
-              <button type="button" className="pv__arrow pv__arrow--prev" aria-label="Previous photo" disabled={index === 0} onClick={() => step(index - 1)}>
+              <button type="button" className="pv__arrow pv__arrow--prev" aria-label="Previous photo" disabled={index === 0} onClick={() => move(-1)}>
                 <IconArrow dir="left" />
               </button>
               <div ref={frame} className="pv__frame" data-swap={swap}>
@@ -349,7 +357,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
                   </div>
                 )}
               </div>
-              <button type="button" className="pv__arrow pv__arrow--next" aria-label="Next photo" disabled={index === photos.length - 1} onClick={() => step(index + 1)}>
+              <button type="button" className="pv__arrow pv__arrow--next" aria-label="Next photo" disabled={index === photos.length - 1} onClick={() => move(1)}>
                 <IconArrow dir="right" />
               </button>
               {reviewPhotos === 'thumbs' && <ReviewThumbs index={index} onIndex={step} />}

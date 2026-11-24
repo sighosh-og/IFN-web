@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 /**
  * Global prototype variants. Add a group here and it appears in the floating widget.
- * Values persist in localStorage and in the URL (?viewerTheme=black), so a link reproduces the state.
+ * Every visit starts on the defaults (Black · Blurred · Mask); changes last until the page is reloaded.
+ * A link can still preselect values (?viewerTheme=white&photoSwap=slide) — handy for sharing one variant.
  */
 export const VARIANT_GROUPS = {
   viewerTheme: {
@@ -11,7 +12,7 @@ export const VARIANT_GROUPS = {
       { value: 'white', label: 'White' },
       { value: 'black', label: 'Black' },
     ],
-    default: 'white',
+    default: 'black',
   },
   viewAllTile: {
     label: 'View all tile',
@@ -36,19 +37,18 @@ export type VariantKey = keyof Groups;
 export type VariantValue<K extends VariantKey> = Groups[K]['options'][number]['value'];
 type State = { [K in VariantKey]: VariantValue<K> };
 
-const STORAGE_KEY = 'noon-web-pdp:variants';
+const OLD_STORAGE_KEY = 'noon-web-pdp:variants'; // earlier builds remembered choices; clear them
 const keys = Object.keys(VARIANT_GROUPS) as VariantKey[];
 const isValid = <K extends VariantKey>(k: K, v: unknown): v is VariantValue<K> =>
   VARIANT_GROUPS[k].options.some((o) => o.value === v);
 
 function initialState(): State {
-  let stored: Partial<Record<VariantKey, unknown>> = {};
-  try { stored = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}'); } catch { /* private mode */ }
+  try { localStorage.removeItem(OLD_STORAGE_KEY); } catch { /* private mode */ }
   const url = new URLSearchParams(location.search);
   const out = {} as Record<VariantKey, unknown>;
   for (const k of keys) {
     const fromUrl = url.get(k);
-    out[k] = isValid(k, fromUrl) ? fromUrl : isValid(k, stored[k]) ? stored[k] : VARIANT_GROUPS[k].default;
+    out[k] = isValid(k, fromUrl) ? fromUrl : VARIANT_GROUPS[k].default;
   }
   return out as State;
 }
@@ -57,16 +57,16 @@ const Ctx = createContext<{ state: State; set: <K extends VariantKey>(k: K, v: V
 
 export function VariantsProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<State>(initialState);
+  const [first] = useState(state);
   const set = useCallback(<K extends VariantKey>(k: K, v: VariantValue<K>) => setState((s) => ({ ...s, [k]: v })), []);
+  // once the widget is used, drop any preselecting params so a reload goes back to the defaults
   useEffect(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* ignore */ }
+    if (state === first) return;
     const url = new URL(location.href);
-    for (const k of keys) {
-      if (state[k] === VARIANT_GROUPS[k].default) url.searchParams.delete(k);
-      else url.searchParams.set(k, state[k]);
-    }
+    if (!keys.some((k) => url.searchParams.has(k))) return;
+    for (const k of keys) url.searchParams.delete(k);
     history.replaceState(history.state, '', url);
-  }, [state]);
+  }, [state]); // eslint-disable-line react-hooks/exhaustive-deps
   const value = useMemo(() => ({ state, set }), [state, set]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

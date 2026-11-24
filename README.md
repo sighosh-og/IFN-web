@@ -40,7 +40,7 @@ To drop a component *inside* a fragment, have `scripts/extract.mjs` replace that
 - **Variants widget** (`src/variants/`): a floating pill at the bottom left, available on every page and above the image view. Groups live in `VARIANT_GROUPS`:
   - Image view: White / Black.
   - Next photo: Mask (default: the contract-then-expand mask) or Slide (`SlideStrip.tsx`, from a reference recording): a parallax pager. Photos are cards on a strip, with neighbours resting just outside the stage. Inside an off-centre card the photo is zoomed 14% and lags back toward the centre, so the card edge sweeps over it; cards one step away sit 8% smaller. It's spring-driven (critically damped, ω 15), so a click mid-slide keeps its momentum. `?photoSwap=slide`.
-  - View all tile: Blurred, where the 7th tile reads "View all (n)", or Gallery button, where the 7th photo stays sharp and a small frosted gallery button bottom-right opens the grid. The choice persists in localStorage and the URL (`?viewerTheme=black`).
+  - View all tile: Blurred, where the 7th tile reads "View all (n)", or Gallery button, where the 7th photo stays sharp and a small frosted gallery button bottom-right opens the grid. Every visit starts on Black · Blurred · Mask; widget changes last until reload. A link can preselect values (`?viewerTheme=white&photoSwap=slide`).
 
 Not included: the sponsored ad strip above the breadcrumb, the cookie banner, and the hover mega-menus in the nav.
 

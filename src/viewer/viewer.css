@@ -147,23 +147,23 @@
   user-select: none;
   -webkit-user-drag: none;
 }
-/* timed to the mask (620ms, contract ≈ 0–225ms, expand ≈ 225–620ms) */
+/* timed to the mask (520ms, contract ≈ 0–190ms, expand ≈ 190–520ms) — deliberately subtle */
 .pv__img--out {
   animation:
-    pv-out-scale 225ms cubic-bezier(0.45, 0, 0.55, 1) forwards,
-    pv-out-op 220ms ease-out 160ms forwards;
+    pv-out-scale 190ms cubic-bezier(0.45, 0, 0.55, 1) forwards,
+    pv-out-op 200ms ease-out 130ms forwards;
   pointer-events: none;
 }
 .pv__img--in {
   z-index: 1;
   animation:
-    pv-in-op 260ms ease-out 170ms both,
-    pv-in-scale 450ms cubic-bezier(0.22, 1, 0.36, 1) 170ms both;
+    pv-in-op 240ms ease-out 140ms both,
+    pv-in-scale 380ms cubic-bezier(0.22, 1, 0.36, 1) 140ms both;
 }
-@keyframes pv-out-scale { to { scale: 0.94; } }
+@keyframes pv-out-scale { to { scale: 0.98; } }
 @keyframes pv-out-op { to { opacity: 0; } }
 @keyframes pv-in-op { from { opacity: 0; } }
-@keyframes pv-in-scale { from { scale: 1.08; } }
+@keyframes pv-in-scale { from { scale: 1.02; } }
 
 .pv__arrow {
   position: absolute;

@@ -30,9 +30,9 @@ const FLY_MS = 460;
 const FLY_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft landing
 // Photo → photo: one rounded mask holds the photos. It contracts (keeping the current shape), then expands
 // into the next photo's exact width × height while the photos crossfade inside it.
-const SWAP_MS = 620;
+const SWAP_MS = 520;
 const CONTRACT_AT = 0.36; // share of SWAP_MS spent contracting
-const CONTRACT = 0.9; // how far the mask closes (relative to the smaller of the two photos)
+const CONTRACT = 0.96; // how far the mask closes (relative to the smaller of the two photos) — kept subtle
 const PHOTO_R = 32; // Airbnb viewer radius
 const TILE_R = 16; // Airbnb grid radius
 
@@ -183,8 +183,9 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     maskFrom.current = null;
     if (el && from && to && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
       maskAnim.current?.cancel();
-      // contract uniformly (same shape as now) to just inside both photos, then open into the next photo's size
-      const k = Math.min(CONTRACT, CONTRACT * Math.min(to.w / from.w, to.h / from.h));
+      // breathe in slightly (same shape as now), then open/reshape into the next photo's exact size.
+      // Only dip further when the next photo is smaller in *both* directions, so the expand still reads as an expand.
+      const k = CONTRACT * Math.min(1, Math.max(to.w / from.w, to.h / from.h));
       maskAnim.current = el.animate(
         [
           { width: `${from.w}px`, height: `${from.h}px`, easing: 'cubic-bezier(0.45, 0, 0.55, 1)' },

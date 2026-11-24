@@ -4,6 +4,7 @@ import { photos, totalPhotos } from './data';
 import { ReviewPanel } from './ReviewPanel';
 import { PhotoGrid } from './PhotoGrid';
 import { ReviewDots } from './ReviewDots';
+import { ReviewThumbs } from './ReviewThumbs';
 import { SlideStrip } from './SlideStrip';
 import { IconArrow, IconClose, IconGrid } from './icons';
 import type { ViewerMode } from './ViewerContext';
@@ -62,6 +63,7 @@ function fit(i: number, box: Rect): Rect {
 export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClose }: Props) {
   const [theme] = useVariant('viewerTheme');
   const [swap] = useVariant('photoSwap');
+  const [reviewPhotos] = useVariant('reviewPhotos');
   const [present, setPresent] = useState(open);
   const [closing, setClosing] = useState(false);
   const [transit, setTransit] = useState<Transit | null>(null);
@@ -304,7 +306,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
               <button type="button" className="pv__icon" aria-label="Show all photos" onClick={toGrid}>
                 <IconGrid />
               </button>
-              <ReviewDots index={index} onIndex={step} />
+              {reviewPhotos === 'dots' ? <ReviewDots index={index} onIndex={step} /> : <div className="pv__pips" aria-hidden />}
               <span className="pv__sr" aria-live="polite" aria-atomic="true">
                 Photo {index + 1} of {photos.length}
               </span>
@@ -350,6 +352,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
               <button type="button" className="pv__arrow pv__arrow--next" aria-label="Next photo" disabled={index === photos.length - 1} onClick={() => step(index + 1)}>
                 <IconArrow dir="right" />
               </button>
+              {reviewPhotos === 'thumbs' && <ReviewThumbs index={index} onIndex={step} />}
             </div>
 
             <ReviewPanel index={index} />

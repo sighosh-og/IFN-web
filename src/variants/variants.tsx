@@ -30,6 +30,14 @@ export const VARIANT_GROUPS = {
     ],
     default: 'mask',
   },
+  reviewPhotos: {
+    label: 'Review photos',
+    options: [
+      { value: 'dots', label: 'Top dots' },
+      { value: 'thumbs', label: 'Bottom carousel' },
+    ],
+    default: 'dots',
+  },
 } as const;
 
 type Groups = typeof VARIANT_GROUPS;

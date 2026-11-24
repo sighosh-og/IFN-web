@@ -4,6 +4,7 @@ import { photos, totalPhotos } from './data';
 import { ReviewPanel } from './ReviewPanel';
 import { PhotoGrid } from './PhotoGrid';
 import { ReviewDots } from './ReviewDots';
+import { SlideStrip } from './SlideStrip';
 import { IconArrow, IconClose, IconGrid } from './icons';
 import type { ViewerMode } from './ViewerContext';
 import './viewer.css';
@@ -34,12 +35,6 @@ const FLY_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft land
 const SWAP_MS = 520;
 const CONTRACT_AT = 0.36; // share of SWAP_MS spent contracting
 const CONTRACT = 0.96; // how far the mask closes (relative to the smaller of the two photos) — kept subtle
-// "Slide" variant (from the reference recording): photos sit on a horizontal strip with a fixed gap. The current
-// one slides off at its own size; the next comes in beside it, starting at the outgoing photo's height and growing
-// to its fitted size as it lands. Fast start, soft landing.
-const SLIDE_MS = 460;
-const SLIDE_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)';
-const SLIDE_GAP = 24;
 const PHOTO_R = 32; // Airbnb viewer radius
 const TILE_R = 16; // Airbnb grid radius
 
@@ -77,9 +72,6 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   const maskFrom = useRef<{ w: number; h: number } | null>(null);
   const maskAnim = useRef<Animation | null>(null);
   const flyer = useRef<HTMLDivElement>(null);
-  // photos sliding off the strip; on a fast click the ones still on screen are re-planned to move with it
-  const [leavers, setLeavers] = useState<{ id: number; index: number; from: string; to: string }[]>([]);
-  const leaverId = useRef(0);
   const focusBack = useRef<Element | null>(null);
 
   // ---------- open / close ----------
@@ -111,10 +103,14 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     if (!present) return;
     const html = document.documentElement;
     const prev = html.style.overflow;
+    const prevPad = html.style.paddingRight;
+    const bar = innerWidth - html.clientWidth; // classic (non-overlay) scrollbar: keep the page from shifting
     html.style.overflow = 'hidden';
+    if (bar > 0) html.style.paddingRight = `${bar}px`;
     sheet.current?.focus({ preventScroll: true });
     return () => {
       html.style.overflow = prev;
+      html.style.paddingRight = prevPad;
       (focusBack.current as HTMLElement | null)?.focus?.({ preventScroll: true });
     };
   }, [present]);
@@ -167,6 +163,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   const step = (i: number) => {
     if (i < 0 || i >= photos.length || i === index) return;
     const token = ++stepToken.current;
+    if (swap === 'slide') return onIndex(i); // the spring starts at once; neighbours are already preloaded
     const img = new Image();
     img.src = photos[i].src;
     Promise.race([img.decode().catch(() => {}), new Promise((r) => setTimeout(r, 350))]).then(() => {
@@ -194,39 +191,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     maskFrom.current = null;
     const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    if (swap === 'slide') {
-      // where the strip is right now (mid-slide on a fast click), read in the same frame as the leavers below
-      const m = el ? new DOMMatrixReadOnly(getComputedStyle(el).transform) : null;
-      const live = m ? { tx: m.e, s: m.a } : null;
-      maskAnim.current?.cancel();
-      if (el && to && box && !reduce) {
-        const dir = Math.sign(index - prev.index);
-        const out = fit(prev.index, box);
-        const { tx, s: sOut } = live ?? { tx: 0, s: 1 };
-        // incoming starts at the outgoing photo's (visible) height, never bigger than its own size
-        const s0 = Math.min(1, Math.max(0.6, (out.h * sOut) / to.h));
-        const outEnd = -dir * (to.w / 2 + SLIDE_GAP + (out.w * sOut) / 2);
-        const inStart = tx + dir * ((out.w * sOut) / 2 + SLIDE_GAP + (to.w * s0) / 2);
-        // incoming = the mask itself; outgoing = .pv__slideOut copies (animated in the effect below)
-        maskAnim.current = el.animate(
-          [{ transform: `translateX(${inStart}px) scale(${s0})` }, { transform: 'none' }],
-          { duration: SLIDE_MS, easing: SLIDE_EASE },
-        );
-        const T = (x: number, k: number) => `translateX(${x}px) scale(${k})`;
-        const delta = outEnd - tx;
-        const reach = (frame.current?.clientWidth ?? innerWidth) / 2 + 900;
-        const still = [...(frame.current?.querySelectorAll<HTMLElement>('.pv__slideOut') ?? [])]
-          .map((n) => ({ index: Number(n.dataset.index), m: new DOMMatrixReadOnly(getComputedStyle(n).transform) }))
-          .filter(({ m }) => Math.abs(m.e) < reach && Math.abs(m.e + delta) < reach * 2);
-        setLeavers([
-          ...still.map(({ index: i, m }) => ({ id: ++leaverId.current, index: i, from: T(m.e, m.a), to: T(m.e + delta, m.a) })),
-          { id: ++leaverId.current, index: prev.index, from: T(tx, sOut), to: T(outEnd, sOut) },
-        ]);
-      } else setLeavers([]);
-      setLeaving(null);
-      const t = setTimeout(() => setLeavers([]), SLIDE_MS);
-      return () => clearTimeout(t);
-    }
+    if (swap === 'slide') { setLeaving(null); return; } // SlideStrip animates itself
 
     if (el && from && to && !reduce) {
       maskAnim.current?.cancel();
@@ -246,25 +211,45 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     return () => clearTimeout(t);
   }, [index, mode, open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // slide variant: send the outgoing photo(s) off along the strip
-  useLayoutEffect(() => {
-    for (const l of leavers) {
-      const n = frame.current?.querySelector<HTMLElement>(`[data-leaver="${l.id}"]`);
-      n?.animate([{ transform: l.from }, { transform: l.to }], { duration: SLIDE_MS, easing: SLIDE_EASE, fill: 'forwards' });
-    }
-  }, [leavers]);
-
   // keyboard
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
+      else if (e.key === 'Tab' && sheet.current) {
+        // keep focus inside the dialog
+        const items = [...sheet.current.querySelectorAll<HTMLElement>('button:not([disabled]), [href], [tabindex="0"]')].filter(
+          (n) => n.offsetParent !== null && !n.closest('[data-leaving], [aria-hidden="true"]'),
+        );
+        if (!items.length) return;
+        const first = items[0];
+        const lastEl = items[items.length - 1];
+        const at = document.activeElement as HTMLElement | null;
+        const inside = at && sheet.current.contains(at) && items.includes(at);
+        if (e.shiftKey && (!inside || at === first)) { e.preventDefault(); lastEl.focus(); }
+        else if (!e.shiftKey && (!inside || at === lastEl)) { e.preventDefault(); first.focus(); }
+      }
       else if (mode === 'photo' && e.key === 'ArrowRight') { e.preventDefault(); step(index + 1); }
       else if (mode === 'photo' && e.key === 'ArrowLeft') { e.preventDefault(); step(index - 1); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
+
+  // horizontal trackpad swipe → one step per gesture (momentum events after the step are swallowed)
+  const swipe = useRef({ acc: 0, locked: false, timer: 0 });
+  const onWheel = (e: React.WheelEvent) => {
+    if (mode !== 'photo' || Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return;
+    const w = swipe.current;
+    clearTimeout(w.timer);
+    w.timer = window.setTimeout(() => { w.acc = 0; w.locked = false; }, 180); // gesture over once events pause
+    if (w.locked) return;
+    w.acc += e.deltaX;
+    if (Math.abs(w.acc) > 60) {
+      w.locked = true;
+      step(index + Math.sign(w.acc));
+    }
+  };
 
   // warm the neighbours
   useEffect(() => {
@@ -320,35 +305,29 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
                 <IconGrid />
               </button>
               <ReviewDots index={index} onIndex={step} />
+              <span className="pv__sr" aria-live="polite" aria-atomic="true">
+                Photo {index + 1} of {photos.length}
+              </span>
               <button type="button" className="pv__icon pv__close" aria-label="Close" onClick={onClose}>
                 <IconClose />
               </button>
             </header>
 
-            <div className="pv__stage">
+            <div className="pv__stage" onWheel={onWheel}>
               <button type="button" className="pv__arrow pv__arrow--prev" aria-label="Previous photo" disabled={index === 0} onClick={() => step(index - 1)}>
                 <IconArrow dir="left" />
               </button>
               <div ref={frame} className="pv__frame" data-swap={swap}>
-                {swap === 'slide' && box && leavers.map((l) => (
-                  <div
-                    key={l.id}
-                    className="pv__slideOut"
-                    data-leaver={l.id}
-                    data-index={l.index}
-                    style={{ width: fit(l.index, box).w, height: fit(l.index, box).h, transform: l.from }}
-                    aria-hidden
-                  >
-                    <img src={photos[l.index].src} alt="" />
-                  </div>
-                ))}
-                {size && box && (
+                {swap === 'slide' && box && (
+                  <SlideStrip index={index} box={box} stageW={frame.current?.parentElement?.clientWidth ?? box.w} hidden={hidePhoto} />
+                )}
+                {swap === 'mask' && size && box && (
                   <div
                     ref={mask}
                     className="pv__mask"
                     style={{ width: size.w, height: size.h, visibility: hidePhoto ? 'hidden' : undefined }}
                   >
-                    {swap === 'mask' && leaving !== null && photos[leaving] && (
+                    {leaving !== null && photos[leaving] && (
                       <img
                         key={`out-${leaving}`}
                         className="pv__img pv__img--out"

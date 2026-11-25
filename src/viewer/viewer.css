@@ -558,6 +558,23 @@
 .pv__tile[data-spec-hover] img { scale: 1.05; }
 .pv__tile:focus-visible img { scale: 1.05; }
 .pv__tile img[data-loaded] { opacity: 1; }
+/* Figma Web IFN / Tile rating: alpha-dark/50 pill, 12px in from the bottom-left, B14/SemiBold + 16px star */
+.pv__tileRating {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font: 600 14px/20px Noontree, Cairo, 'Helvetica Neue', Arial, sans-serif;
+  letter-spacing: -0.1px;
+  pointer-events: none;
+}
+.pv__tileRating svg { display: block; flex: none; }
 /* results on their way (Figma 4.2): placeholder tiles only; photos fade back in over 320ms */
 .pv__grid[data-loading] .pv__tile { cursor: progress; }
 .pv__grid[data-loading] .pv__tile img { opacity: 0; transition: none; }

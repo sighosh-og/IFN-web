@@ -1,5 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { photos } from './data';
+import { photos, reviewsById } from './data';
 
 const GAP = 12; // Airbnb grid: 12px gutters, 16px tile radius
 
@@ -89,7 +89,7 @@ export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut, reveal = fa
             className="pv__tile"
             data-index={i}
             style={{ left: x, top: y, width: w, height: h, visibility: hiddenIndex === i ? 'hidden' : undefined }}
-            aria-label={`Open photo ${rank + 1} of ${order.length}`}
+            aria-label={`Open photo ${rank + 1} of ${order.length}, ${ratingOf(i)} star review`}
             tabIndex={loading ? -1 : undefined}
             onClick={(e) => !loading && onPick(i, e.currentTarget)}
           >
@@ -100,10 +100,28 @@ export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut, reveal = fa
               loading={Math.abs(rank - near) < 16 ? 'eager' : 'lazy'}
               onLoad={(e) => e.currentTarget.setAttribute('data-loaded', '')}
             />
+            <TileRating rating={ratingOf(i)} />
           </button>
         ))}
       </div>
     </div>
+  );
+}
+
+const ratingOf = (i: number) => reviewsById.get(photos[i].review)?.rating ?? 0;
+
+/**
+ * Figma Web IFN / Tile rating (5417:7663): the star rating of the review the photo belongs to, bottom-left on
+ * every tile (loading included). Display only; it stays put on hover — only the photo scales.
+ */
+function TileRating({ rating }: { rating: number }) {
+  return (
+    <span className="pv__tileRating" aria-hidden>
+      {rating}
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M7.00895 2.7119C7.47037 1.9637 8.5736 1.97579 9.01432 2.74812L10.3535 5.09529L12.9287 5.72338C12.9329 5.72429 12.9371 5.72505 12.9412 5.72606C13.7764 5.93011 14.1122 6.93723 13.5651 7.60123L11.7942 9.75121L12.0251 12.5514L12.0277 12.5928C12.0698 13.4556 11.1827 14.0683 10.3862 13.7125L8.00171 12.6476L5.61727 13.7125C4.80735 14.0737 3.90546 13.4358 3.97843 12.5514L4.20923 9.75121L2.43831 7.60131C1.89119 6.93731 2.22714 5.93011 3.06225 5.72606L5.64819 5.09529L6.98747 2.74812L7.00895 2.7119Z" />
+      </svg>
+    </span>
   );
 }
 

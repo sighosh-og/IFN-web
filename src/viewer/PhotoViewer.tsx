@@ -6,7 +6,8 @@ import { PhotoGrid } from './PhotoGrid';
 import { ReviewDots } from './ReviewDots';
 import { ReviewThumbs } from './ReviewThumbs';
 import { SlideStrip } from './SlideStrip';
-import { IconArrow, IconClose, IconGrid } from './icons';
+import { IconArrow, IconClose } from './icons';
+import { GalleryButton } from './GalleryButton';
 import type { ViewerMode } from './ViewerContext';
 import './viewer.css';
 
@@ -70,6 +71,11 @@ function fit(i: number, box: Rect): Rect {
  * grid mode = masonry. Added for noon: a review panel docked right.
  */
 export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClose }: Props) {
+  // when this opening started — the gallery button's "Gallery" label times itself from it
+  const openedAt = useRef(0);
+  const wasOpen = useRef(false);
+  if (open && !wasOpen.current) openedAt.current = performance.now();
+  wasOpen.current = open;
   const [theme] = useVariant('viewerTheme');
   const [swap] = useVariant('photoSwap');
   const [reviewPhotos] = useVariant('reviewPhotos');
@@ -332,9 +338,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
         {showPhoto && (
           <div className="pv__layer pv__photoMode" data-leaving={mode !== 'photo' || undefined}>
             <header className="pv__bar">
-              <button type="button" className="pv__icon" aria-label="Show all photos" onClick={toGrid}>
-                <IconGrid />
-              </button>
+              <GalleryButton openedAt={openedAt.current} onClick={toGrid} />
               {reviewPhotos === 'dots' ? <ReviewDots index={index} onIndex={step} /> : <div className="pv__pips" aria-hidden />}
               <span className="pv__sr" aria-live="polite" aria-atomic="true">
                 Photo {index + 1} of {photos.length}

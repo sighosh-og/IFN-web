@@ -103,7 +103,79 @@
   pointer-events: none;
 }
 .pv__bar > * { pointer-events: auto; grid-row: 1; }
-.pv__bar > .pv__icon:first-child { grid-column: 1; justify-self: start; }
+.pv__bar > .pv__icon:first-child,
+.pv__bar > .pv__galleryBtn { grid-column: 1; justify-self: start; }
+
+/* ---------- gallery button (Figma 5322:21728): fanned stack of the first 3 photos + "Gallery" ---------- */
+.pv__galleryBtn {
+  --fold: 480ms cubic-bezier(0.65, 0, 0.35, 1);
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--pv-btn);
+  color: var(--pv-fg) !important;
+  cursor: pointer;
+  transition: background-color 150ms ease, transform 150ms ease, padding var(--fold);
+}
+.pv__galleryBtn[data-labelled] { padding-right: 16px; }
+.pv__galleryBtn:active { transform: scale(0.96); }
+@media (hover: hover) and (pointer: fine) { .pv__galleryBtn:hover { background: var(--pv-btn-hover); } }
+
+/* label folds away with the button: width via 1fr → 0fr, text fades a little ahead of it */
+.pv__galleryLabel {
+  display: grid;
+  grid-template-columns: 0fr;
+  margin-left: 0;
+  opacity: 0;
+  transition: grid-template-columns var(--fold), margin-left var(--fold), opacity 220ms ease;
+}
+.pv__galleryLabel > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font: 700 16px/22.4px Noontree, Cairo, 'Helvetica Neue', Arial, sans-serif;
+  color: var(--pv-fg);
+}
+.pv__galleryBtn[data-labelled] .pv__galleryLabel {
+  grid-template-columns: 1fr;
+  margin-left: 8px;
+  opacity: 1;
+  transition: grid-template-columns var(--fold), margin-left var(--fold), opacity 260ms ease 120ms;
+}
+
+.pv__stack { position: relative; flex: none; width: 53px; height: 40px; }
+.pv__stackCard {
+  /* positions/angles from the Figma stack, measured about each card's centre */
+  --r: 0deg;
+  position: absolute;
+  width: 31.7px;
+  height: 31.7px;
+  border: 1.8px solid #fff;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  rotate: var(--r);
+}
+.pv[data-theme='white'] .pv__stackCard { box-shadow: 0 0 0 0.5px rgba(14, 14, 14, 0.12), 0 1px 3px rgba(14, 14, 14, 0.1); }
+.pv__stackCard img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.pv__stackCard[data-card='2'] { left: 18.5px; top: 3.2px; --r: -5.63deg; --w: 6deg; --dx: 1.5px; --delay: 70ms; }
+.pv__stackCard[data-card='1'] { left: 11.75px; top: 2.85px; --r: -11.34deg; --w: -2.5deg; --dx: 0px; --delay: 35ms; }
+.pv__stackCard[data-card='0'] { left: 3.3px; top: 4.05px; --r: -16.94deg; --w: -7deg; --dx: -1.5px; --delay: 0ms; }
+
+/* hover: the stack fans out and settles, back cards trailing the front one */
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  .pv__galleryBtn:hover .pv__stackCard { animation: pv-stack-wiggle 620ms cubic-bezier(0.37, 0, 0.3, 1) var(--delay) both; }
+}
+@keyframes pv-stack-wiggle {
+  0% { rotate: var(--r); translate: 0 0; }
+  28% { rotate: calc(var(--r) + var(--w)); translate: var(--dx) -1px; }
+  56% { rotate: calc(var(--r) - var(--w) * 0.45); translate: calc(var(--dx) * -0.4) 0; }
+  80% { rotate: calc(var(--r) + var(--w) * 0.15); translate: 0 0; }
+  100% { rotate: var(--r); translate: 0 0; }
+}
 
 /* photos-in-this-review indicator (top bar, centred over the photo) */
 .pv__pips { grid-column: 1; justify-self: center; display: flex; align-items: center; animation: pv-fade-in 240ms ease-out; }

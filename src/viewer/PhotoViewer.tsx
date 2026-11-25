@@ -27,7 +27,7 @@ type Rect = { x: number; y: number; w: number; h: number };
  *  open    page strip tile → photo        close   photo → page strip tile
  *  toPhoto grid tile → photo              toGrid  photo → grid tile
  */
-type Transit = { kind: 'open' | 'close' | 'toPhoto' | 'toGrid'; index: number; from: Rect; fromR: number; to?: Rect; toR?: number };
+type Transit = { kind: 'open' | 'close' | 'toPhoto' | 'toGrid'; index: number; from: Rect; fromR: number; to?: Rect; toR?: number; /** photo zoom inside the source tile (grid hover) */ fromZoom?: number };
 
 const FLY_MS = 460;
 const FLY_EASE = 'cubic-bezier(0.32, 0.72, 0, 1)'; // fast start, long soft landing
@@ -154,6 +154,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     const { from, to, fromR, toR } = transit;
     const kf = (r: Rect, rad: number) => ({ left: `${r.x}px`, top: `${r.y}px`, width: `${r.w}px`, height: `${r.h}px`, borderRadius: `${rad}px` });
     const anim = el.animate([kf(from, fromR), kf(to, toR!)], { duration: FLY_MS, easing: FLY_EASE, fill: 'forwards' });
+    if (transit.fromZoom) el.firstElementChild?.animate([{ scale: transit.fromZoom }, { scale: 1 }], { duration: FLY_MS, easing: FLY_EASE });
     anim.onfinish = () => {
       if (transit.kind === 'close') { setPresent(false); setClosing(false); }
       setTransit(null);
@@ -295,7 +296,9 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
     onMode('grid');
   };
   const pickFromGrid = (i: number, tile: HTMLElement) => {
-    setTransit({ kind: 'toPhoto', index: i, from: rectOf(tile), fromR: TILE_R });
+    // a hovered tile has its photo zoomed in a little; the flight starts from that zoom so nothing pops
+    const z = parseFloat(getComputedStyle(tile.querySelector('img')!).scale);
+    setTransit({ kind: 'toPhoto', index: i, from: rectOf(tile), fromR: TILE_R, fromZoom: z > 1 ? z : undefined });
     onIndex(i);
     onMode('photo');
   };

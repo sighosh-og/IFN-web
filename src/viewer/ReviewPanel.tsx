@@ -71,12 +71,30 @@ type Review = NonNullable<ReturnType<typeof reviewsById.get>>;
 function Reviewer({ review }: { review: Review }) {
   return (
     <div className="pv__reviewer">
-      <span className="pv__profile" aria-hidden />
+      <Avatar name={review.name} src={(review as { avatar?: string }).avatar} />
       <div className="pv__reviewerText">
         <span className="pv__name">{review.name}</span>
         <span className="pv__date">{fmtDate(review.date)}</span>
       </div>
     </div>
+  );
+}
+
+/** "Hamza R." → "HR", "Anonymous" → "A"; Arabic names take one letter (two would join into a ligature) */
+const initials = (name: string) => {
+  const words = name.replace(/\./g, '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '';
+  if (isArabic(name) || words.length === 1) return [...words[0]][0].toUpperCase();
+  return ([...words[0]][0] + [...words[words.length - 1]][0]).toUpperCase();
+};
+
+/** The reviewer's photo when there is one; otherwise (or if it fails to load) their initials. */
+function Avatar({ name, src }: { name: string; src?: string }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <span className="pv__avatar" aria-hidden>
+      {src && !failed ? <img src={src} alt="" onError={() => setFailed(true)} /> : initials(name)}
+    </span>
   );
 }
 

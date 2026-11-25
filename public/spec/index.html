@@ -626,21 +626,32 @@ window.SPEC = (() => {
   }
 
   /* ═══ states, fast-forwarded on the virtual clock from a fresh load ═══ */
-  const settled = (d) => { const pv = d.querySelector('.pv'); return !!pv && !d.querySelector('.pv__flyer') && pv.getAnimations({ subtree: true }).every((a) => a.playState === 'finished'); };
+  // settled = no flight, and every animation in the view done — except photos fading in as they load: on a cold cache
+  // they keep arriving in real time while the virtual clock races ahead, so waiting on them would never end
+  const settled = (d) => { const pv = d.querySelector('.pv'); return !!pv && !d.querySelector('.pv__flyer')
+    && pv.getAnimations({ subtree: true }).every((a) => a.playState === 'finished' || (a.effect && a.effect.target && a.effect.target.tagName === 'IMG')); };
+  // wait for a set-up step to settle. Each 96ms of virtual time also yields one real frame: some things only land on a
+  // real rendering frame (an animation's onfinish, which ends a photo flight), and a cold load can delay those well past
+  // the instant the virtual clock would otherwise reach its limit. A step that never settles still records, from where it got.
+  const until = async (e, cond, max = 12000) => { const lim = e.vt + max;
+    while (!cond()) { if (e.vt >= lim) { console.warn('[spec] set-up step did not settle — recording anyway'); return; }
+      await e.advanceTo(e.vt + 96, 48); await new Promise((r) => setTimeout(r, 16)); } };
   const decode = async (w, src) => { if (!src) return; const im = new w.Image(); im.src = src; try { await im.decode(); } catch (_) {} };
   const stripSrc = (d, i) => d.querySelector(`.cp__tile[data-index="${i}"] img`)?.src;
   const ST = {
-    async pdp(d, w, e) { d.querySelector('.cp__tile[data-index="2"]').scrollIntoView({ block: 'center' }); await e.advanceTo(e.vt + 200, 48); },
-    async photo(d, w, e) { await ST.pdp(d, w, e); d.querySelector('.cp__tile[data-index="2"]').click(); await e.stepUntil(() => settled(d));
+    async pdp(d, w, e) { d.querySelector('.cp__tile[data-index="2"]').scrollIntoView({ block: 'center' });
+      await Promise.race([Promise.all([...d.querySelectorAll('.cp__tile img')].map((im) => decode(w, im.src))), new Promise((r) => w.parent.setTimeout(r, 4000))]);   // real time: the strip's photos, once
+      await e.advanceTo(e.vt + 200, 48); },
+    async photo(d, w, e) { await ST.pdp(d, w, e); d.querySelector('.cp__tile[data-index="2"]').click(); await until(e, () => settled(d));
       await decode(w, stripSrc(d, 3)); await decode(w, stripSrc(d, 4)); },
     async review3(d, w, e) { await ST.photo(d, w, e); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
-      await e.stepUntil(() => settled(d) && d.querySelector('.pv__thumb[aria-current]') === d.querySelectorAll('.pv__thumb')[1]); await e.advanceTo(e.vt + 400, 48); await decode(w, stripSrc(d, 4)); },
-    async grid(d, w, e) { await ST.photo(d, w, e); d.querySelector('.pv__galleryBtn').click(); await e.stepUntil(() => settled(d) && !!d.querySelector('.pv__gridMode') && !d.querySelector('.pv__photoMode')); },
-    async folded(d, w, e) { await ST.photo(d, w, e); await e.stepUntil(() => !d.querySelector('.pv__galleryBtn[data-labelled]') && settled(d)); },
+      await until(e, () => settled(d) && d.querySelector('.pv__thumb[aria-current]') === d.querySelectorAll('.pv__thumb')[1]); await e.advanceTo(e.vt + 400, 48); await decode(w, stripSrc(d, 4)); },
+    async grid(d, w, e) { await ST.photo(d, w, e); d.querySelector('.pv__galleryBtn').click(); await until(e, () => settled(d) && !!d.querySelector('.pv__gridMode') && !d.querySelector('.pv__photoMode')); },
+    async folded(d, w, e) { await ST.photo(d, w, e); await until(e, () => !d.querySelector('.pv__galleryBtn[data-labelled]') && settled(d)); },
     async wide(d, w, e) {   // photo 66 (portrait), next is 67 (landscape)
-      await ST.pdp(d, w, e); d.querySelector('.cp__tile--more, .cp__galleryBtn').click(); await e.stepUntil(() => settled(d) && !!d.querySelector('.pv__tile[data-index="66"]'));
+      await ST.pdp(d, w, e); d.querySelector('.cp__tile--more, .cp__galleryBtn').click(); await until(e, () => settled(d) && !!d.querySelector('.pv__tile[data-index="66"]'));
       const next = d.querySelector('.pv__tile[data-index="66"] img').src, tile = d.querySelector('.pv__tile[data-index="65"]');
-      tile.scrollIntoView({ block: 'center' }); await e.advanceTo(e.vt + 100, 48); tile.click(); await e.stepUntil(() => settled(d) && !!d.querySelector('.pv__photoMode') && !d.querySelector('.pv__gridMode'));
+      tile.scrollIntoView({ block: 'center' }); await e.advanceTo(e.vt + 100, 48); tile.click(); await until(e, () => settled(d) && !!d.querySelector('.pv__photoMode') && !d.querySelector('.pv__gridMode'));
       await decode(w, next); },
   };
   const PREP = { 0: 'pdp', 1: 'pdp', 2: 'photo', 3: 'review3', 4: 'wide', 5: 'photo', 6: 'grid', 7: 'pdp', 8: 'photo', 9: 'pdp', 10: 'folded', 11: 'grid', 12: 'photo' };

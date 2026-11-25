@@ -64,7 +64,7 @@
   --pv-fg: #fff;
   --pv-text: rgba(255, 255, 255, 0.86);
   --pv-muted: rgba(255, 255, 255, 0.56);
-  --pv-line: rgba(255, 255, 255, 0.12);
+  --pv-line: rgba(255, 255, 255, 0.16); /* alpha-light/16 — the panel's left divider */
   --pv-chip: rgba(255, 255, 255, 0.08);
   --pv-hover: rgba(255, 255, 255, 0.1);
   --pv-disabled: rgba(255, 255, 255, 0.24);
@@ -418,10 +418,10 @@
 .pv__title { margin: 0; font-size: 16px; line-height: 22px; font-weight: 600; letter-spacing: -0.15px; color: var(--pv-rv-bold); }
 .pv__comment { margin: 0; font-size: 14px; line-height: 20px; font-weight: 400; color: var(--pv-rv-subtle); }
 
-.pv__specs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 8px 0 4px; list-style: none; }
+.pv__specs { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 8px 0; list-style: none; } /* + the card's 8px gaps = Figma's 16px band */
 .pv__spec {
   max-width: 100%;
-  padding: 4px 6px;
+  padding: 6px 8px;
   border-radius: 8px;
   background: var(--pv-rv-chip);
   color: var(--pv-rv-bold);
@@ -450,7 +450,7 @@
   mask: url('/viewer/divider.svg') 0 0 / 100% 100% no-repeat;
 }
 
-.pv__byline { display: flex; align-items: center; gap: 12px; }
+.pv__byline { display: flex; align-items: center; gap: 12px; padding-top: 4px; } /* 8 gap + 4 = Figma's 12 above Like */
 
 /* "Top, by close" reviewer variant: avatar + name/date in the panel's top band, centred on the close button */
 .pv__panel { position: relative; }
@@ -466,11 +466,9 @@
   letter-spacing: -0.1px;
 }
 .pv__panelHead > .pv__reviewLayer { grid-area: 1 / 1; }
-.pv__reviewer { display: flex; align-items: center; gap: 12px; min-width: 0; }
-/* user photo slot; until a reviewer has one, their initials sit in it */
+.pv__reviewer { display: flex; align-items: center; gap: 8px; min-width: 0; }
+/* Figma Web IFN / Reviewer: avatar 40, alpha-light/16, initials B14/SemiBold on-surface-bold */
 .pv__avatar {
-  /* tinted per reviewer (--h, a hue from their name) so it never reads as another grey button next to the X */
-  --h: 220;
   flex: none;
   display: grid;
   place-items: center;
@@ -478,15 +476,21 @@
   height: 40px;
   border-radius: 50%;
   overflow: hidden;
-  background: hsl(var(--h) 75% 92%);
-  color: hsl(var(--h) 45% 28%);
+  background: var(--pv-rv-chip);
+  color: var(--pv-rv-bold);
   font-size: 14px;
-  line-height: 1;
-  font-weight: 700;
-  letter-spacing: 0.2px;
+  line-height: 20px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
   user-select: none;
 }
-.pv[data-theme='black'] .pv__avatar { background: hsl(var(--h) 38% 30%); color: hsl(var(--h) 80% 90%); }
+.pv__avatarIcon {
+  width: 24px;
+  height: 24px;
+  background: currentColor;
+  -webkit-mask: url('/viewer/user-circle.svg') center / 24px 24px no-repeat;
+  mask: url('/viewer/user-circle.svg') center / 24px 24px no-repeat;
+}
 .pv__avatar img { width: 100%; height: 100%; object-fit: cover; }
 .pv__reviewerText { display: flex; flex-direction: column; min-width: 0; }
 .pv__reviewerText .pv__name { white-space: nowrap; }

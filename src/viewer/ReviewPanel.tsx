@@ -2,11 +2,12 @@ import { photos, reviewsById } from './data';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { useVariant } from '../variants/variants';
 
+// "12 Mar 2026" (Figma Web IFN / Reviewer)
 const fmtDate = (iso: string) =>
-  new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  new Date(iso + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-// Rating pill fill (Figma "Ratings": green/700 for 5★); lower ratings keep noon's review-star colours.
-const PILL: Record<number, string> = { 5: '#0f8857', 4: '#0f8857', 3: '#05af25', 2: '#f8b200', 1: '#f36302' };
+// Rating pill fill — Origin rating colours (Figma Web IFN / Review panel: 4★ = green/500 #26b57c)
+const PILL: Record<number, string> = { 5: '#0f8857', 4: '#26b57c', 3: '#f5c400', 2: '#fd8835', 1: '#f04242' };
 // "silver" → "Silver", but leave "iPhone" / "eSIM" alone
 const cap = (s: string) => (/^[a-z][a-z]/.test(s) ? s[0].toUpperCase() + s.slice(1) : s);
 const isArabic = (s: string) => /[؀-ۿ]/.test(s);
@@ -88,16 +89,22 @@ const initials = (name: string) => {
   return ([...words[0]][0] + [...words[words.length - 1]][0]).toUpperCase();
 };
 
-/** A steady hue per name, from a fixed set that sits well on both themes. */
-const HUES = [212, 262, 330, 18, 38, 152, 186];
-const hueOf = (name: string) => HUES[[...name].reduce((h, c) => (h * 31 + c.codePointAt(0)!) >>> 0, 7) % HUES.length];
-
-/** The reviewer's photo when there is one; otherwise (or if it fails to load) their initials on a tint. */
+/**
+ * Figma Web IFN / Reviewer avatar: 40 round on alpha-light/16. The reviewer's photo when there is one,
+ * otherwise their initials; anonymous reviewers get the Origin user-circle icon.
+ */
 function Avatar({ name, src }: { name: string; src?: string }) {
   const [failed, setFailed] = useState(false);
+  const anonymous = !name.trim() || /^anonymous$/i.test(name.trim());
   return (
-    <span className="pv__avatar" style={{ '--h': hueOf(name) } as React.CSSProperties} aria-hidden>
-      {src && !failed ? <img src={src} alt="" onError={() => setFailed(true)} /> : initials(name)}
+    <span className="pv__avatar" aria-hidden>
+      {src && !failed ? (
+        <img src={src} alt="" onError={() => setFailed(true)} />
+      ) : anonymous ? (
+        <span className="pv__avatarIcon" />
+      ) : (
+        initials(name)
+      )}
     </span>
   );
 }
@@ -140,8 +147,6 @@ function ReviewBody({ review, bylineOnTop }: { review: Review; bylineOnTop: bool
       {isArabic(review.comment) && (
         <button type="button" className="pv__translate">See Translation (English)</button>
       )}
-
-      <div className="pv__divider" aria-hidden />
 
       <footer className="pv__byline">
         {!bylineOnTop && (

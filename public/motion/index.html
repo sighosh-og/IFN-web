@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Motion Standard</title>
+<link rel="icon" href="data:," />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" />
+<style>
+/* noon Motion Standard — the noon_sas_motion skill as a developer reference.
+   Every section below the core cards is rendered at load time from the skill's own markdown
+   (/.claude/skills/noon_sas_motion/), so this page always shows exactly what the skill says.
+   Same Lightweight UI look as the spec sheet: Geist / Geist Mono, ink on paper, ink washes,
+   values in the accent, easing functions in violet. Light theme only, like the spec sheet. */
+:root {
+  --bg: #ffffff;
+  --card: #ffffff;
+  --ink: #18191d;
+  --on-ink: #ffffff;
+  --muted: #666879;
+  --line: #ededec;
+  --line-strong: #e3e3e0;
+  --wash-1: color-mix(in oklab, var(--ink) 1.5%, transparent);
+  --wash-2: color-mix(in oklab, var(--ink) 3%, transparent);
+  --wash-3: color-mix(in oklab, var(--ink) 4%, transparent);
+  --wash-4: color-mix(in oklab, var(--ink) 6%, transparent);
+  --wash-6: color-mix(in oklab, var(--ink) 12%, transparent);
+  --ink-hover: color-mix(in oklab, var(--ink) 88%, var(--bg));
+  --draft: #96660b; --draft-bg: #fbf3e3;
+  --accent: #ec642b;
+  --fn: #7c5cff;
+  --canvas: color-mix(in oklab, #18191d 3%, #ffffff);
+
+  --r-xs: 6px; --r-lg: 8px; --r-chip: 10px; --r-xl: 12px; --r-control: 14px; --r-2xl: 16px; --r-tile: 20px;
+  --r-full: 999px;
+  --sh-card: 0 1px 2px rgb(0 0 0 / .04);
+  --sh-toast: 0 12px 32px -12px rgb(0 0 0 / .32);
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --d-press: 160ms;
+
+  --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --t-micro: 11px; --t-caption: 12px; --t-label: 13px; --t-ui: 14px; --t-body: 15px; --t-title: 17px;
+
+  --top: 56px; --toc: 232px; --gut: 28px;
+  color-scheme: light;
+}
+* { box-sizing: border-box; corner-shape: superellipse(4); }
+@supports not (corner-shape: round) {
+  :root { --r-xs: .9px; --r-lg: 1.2px; --r-chip: 1.5px; --r-xl: 1.8px; --r-control: 2.1px; --r-2xl: 2.4px; --r-tile: 3px; --r-full: 2.4px; }
+}
+html, body { margin: 0; }
+html { scroll-padding-top: calc(var(--top) + 20px); }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: var(--t-ui); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+button, input { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+svg { flex: none; }
+[hidden] { display: none !important; }
+
+/* press feedback, as the spec sheet's (the kit's u-press) */
+.top__back, .btn, .tabs button, .play, .copybtn, .toc a {
+  transition: transform var(--d-press) var(--ease-out), background-color var(--d-press) var(--ease-out), color var(--d-press) var(--ease-out);
+}
+.top__back:active, .btn:active, .play:active, .copybtn:active { transform: scale(.97); }
+
+/* ── top bar ── */
+.top { position: sticky; top: 0; z-index: 20; height: var(--top); display: flex; align-items: center; gap: 12px; padding: 0 var(--gut) 0 18px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.top__back { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-chip); text-decoration: none; flex: none; }
+.top__back svg { width: 18px; height: 18px; }
+.top__title { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: var(--t-body); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.top__sp { flex: 1; }
+.tag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: var(--r-full); background: var(--wash-4); color: var(--muted); font-family: var(--mono); font-size: var(--t-micro); font-weight: 500; letter-spacing: 0; white-space: nowrap; }
+.search { position: relative; display: flex; align-items: center; width: 260px; height: 36px; padding: 0 10px 0 34px; border: 1px solid var(--line-strong); border-radius: var(--r-control); background: var(--bg); }
+.search:focus-within { border-color: var(--ink); }
+.search svg { position: absolute; left: 11px; width: 15px; height: 15px; color: var(--muted); }
+.search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; font-size: var(--t-ui); }
+.search input::placeholder { color: var(--muted); }
+.search input::-webkit-search-cancel-button { display: none; }
+.search kbd { flex: none; min-width: 20px; height: 20px; display: grid; place-items: center; border-radius: var(--r-xs); background: var(--wash-4); font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); }
+.search:focus-within kbd { display: none; }
+.btn { height: 36px; padding: 0 14px; display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r-control); background: var(--ink); color: var(--on-ink); font-size: var(--t-ui); font-weight: 500; text-decoration: none; white-space: nowrap; flex: none; }
+.btn svg { width: 15px; height: 15px; }
+
+/* ── shell: contents rail + document ── */
+.shell { display: grid; grid-template-columns: var(--toc) minmax(0, 1fr); }
+.toc { position: sticky; top: var(--top); align-self: start; height: calc(100vh - var(--top)); overflow: auto; padding: 24px 12px 32px 16px; border-right: 1px solid var(--line); scrollbar-width: none; }
+.toc::-webkit-scrollbar { display: none; }
+.toc__h { margin: 0 0 8px 12px; font-size: var(--t-micro); font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.toc ol { list-style: none; margin: 0 0 20px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.toc a { height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: var(--r-chip); text-decoration: none; font-size: var(--t-label); color: var(--muted); }
+.toc a[aria-current="true"] { background: var(--wash-4); color: var(--ink); font-weight: 500; }
+.toc a span { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toc a.is-empty { opacity: .4; }
+.count { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 6px; border-radius: var(--r-xs); background: var(--wash-4); font-size: var(--t-micro); font-weight: 600; line-height: 1; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+main { min-width: 0; padding: 36px 48px 120px; }
+.wrap { max-width: 1120px; margin: 0 auto; }
+.lede { margin: 0 0 8px; max-width: 720px; color: var(--muted); }
+.empty { margin: 40px 0; padding: 32px; border: 1px solid var(--line); border-radius: var(--r-tile); text-align: center; color: var(--muted); }
+
+/* sections */
+.sec { padding-top: 40px; margin-top: 40px; border-top: 1px solid var(--line); }
+#doc > .sec:first-child { padding-top: 0; margin-top: 0; border-top: 0; }
+.sec__h { margin: 0 0 6px; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.3; }
+.sec__src { margin: 0 0 20px; font-family: var(--mono); font-size: var(--t-caption); color: var(--muted); }
+.sec__src a { text-decoration: none; border-bottom: 1px solid var(--line-strong); }
+
+/* ── core value cards ── */
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; margin-top: 20px; }
+.tok { min-width: 0; padding: 20px 22px 22px; border: 1px solid var(--line); border-radius: var(--r-tile); background: var(--card); box-shadow: var(--sh-card); }
+.tok__head { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; }
+.tok__head h3 { margin: 0; font-size: var(--t-title); font-weight: 600; letter-spacing: -0.01em; }
+.tok__role { margin: 0 0 14px; font-size: var(--t-label); color: var(--muted); }
+.x { font-family: var(--mono); font-size: var(--t-label); font-weight: 500; color: var(--fn); word-break: break-word; }
+.x .n { color: var(--accent); }
+.tok .x { display: block; margin: 0 0 14px; }
+.plot { position: relative; margin: 0 0 12px; border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--wash-1); cursor: pointer; }
+.plot svg { display: block; width: 100%; height: 132px; }
+.plot .ax { font-family: var(--mono); font-size: 10px; fill: var(--muted); }
+.demo { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; }
+.play { width: 32px; height: 32px; display: grid; place-items: center; flex: none; border-radius: var(--r-chip); background: var(--ink); color: var(--on-ink); }
+.play svg { width: 11px; height: 12px; margin-left: 1px; }
+.lane { position: relative; flex: 1; height: 32px; border-radius: var(--r-chip); background: var(--wash-2); overflow: hidden; }
+.lane i { position: absolute; top: 6px; left: 6px; width: 20px; height: 20px; border-radius: 6px; background: var(--ink); will-change: transform, opacity; }
+.lane--center i { left: calc(50% - 10px); }
+.lane--box i { top: 4px; width: 24px; height: 24px; left: calc(50% - 12px); border-radius: 0; corner-shape: round; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; margin: 0 0 16px; }
+.kv > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.kv > .wide { grid-column: 1 / -1; }
+.kv dt { flex: none; font-size: var(--t-label); color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; font-family: var(--mono); font-size: var(--t-label); font-weight: 500; color: var(--accent); font-variant-numeric: tabular-nums; }
+.kv dd small { font-family: var(--sans); font-size: var(--t-caption); font-weight: 400; color: var(--muted); }
+/* platform tabs — one choice for the whole page */
+.tabs { display: flex; flex-wrap: wrap; gap: 2px; margin: 0 0 8px; padding: 2px; border-radius: var(--r-chip); background: var(--wash-3); }
+.tabs button { height: 26px; padding: 0 8px; border-radius: 8px; font-size: var(--t-caption); font-weight: 500; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--bg); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.code { position: relative; }
+pre { margin: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--wash-2); font-family: var(--mono); font-size: 12.5px; line-height: 1.625; color: color-mix(in oklab, var(--ink) 90%, transparent); white-space: pre-wrap; word-break: break-word; }
+.code pre { padding-right: 64px; min-height: 48px; }
+.copybtn { position: absolute; top: 8px; right: 8px; height: 26px; padding: 0 9px; border-radius: 8px; background: var(--bg); border: 1px solid var(--line); font-size: var(--t-caption); font-weight: 500; }
+
+/* rhythm: the non-curve values */
+.rh { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin-top: 16px; }
+.rh .tok { padding-bottom: 18px; }
+.rh .kv { margin: 0; grid-template-columns: 1fr; gap: 8px; }
+
+/* ── rendered skill markdown ── */
+.md { max-width: 100%; }
+.md h3 { margin: 32px 0 10px; font-size: var(--t-title); font-weight: 600; letter-spacing: -0.01em; line-height: 1.35; }
+.md h4 { margin: 24px 0 8px; font-size: var(--t-body); font-weight: 600; line-height: 1.4; }
+.md h5 { margin: 20px 0 6px; font-size: var(--t-ui); font-weight: 600; }
+.md p, .md ul, .md ol { margin: 0 0 12px; max-width: 760px; }
+.md ul, .md ol { padding-left: 20px; }
+.md li { margin: 3px 0; }
+.md li::marker { color: var(--muted); }
+.md strong { font-weight: 600; }
+.md a { text-decoration: none; border-bottom: 1px solid var(--line-strong); }
+.md code { padding: 1px 5px; border-radius: var(--r-xs); background: var(--wash-3); font-family: var(--mono); font-size: 12.5px; color: color-mix(in oklab, var(--ink) 92%, transparent); word-break: break-word; cursor: copy; }
+.md pre code { padding: 0; background: none; cursor: auto; }
+.md pre { margin: 0 0 16px; }
+.md hr { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+.md input[type=checkbox] { margin: 0 8px 0 0; accent-color: var(--ink); vertical-align: -1px; }
+.md li:has(> input[type=checkbox]) { list-style: none; margin-left: -20px; }
+.tw { margin: 0 0 20px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-xl); }
+/* columns take their content's width (numbers never wrap); only long prose cells wrap, at 300px.
+   A table wider than the page scrolls inside its own frame. */
+.md table { width: max-content; min-width: 100%; border-collapse: collapse; font-size: var(--t-label); line-height: 1.5; }
+/* headers keep the file's own case: uppercasing would turn ω / ζ into Ω / Ζ */
+.md th { padding: 10px 14px; background: var(--wash-1); border-bottom: 1px solid var(--line); text-align: left; font-size: var(--t-caption); font-weight: 600; color: var(--muted); white-space: nowrap; }
+.md td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: top; max-width: 300px; }
+.md tbody tr:first-child td { border-top: 0; }
+.md td:first-child { font-weight: 500; }
+.md td code { font-size: 12px; }
+.md td.mini { width: 84px; min-width: 84px; padding-right: 4px; }
+.mini svg { display: block; width: 76px; height: 30px; }
+.mini.is-tall svg { height: 34px; }
+
+/* files */
+.files { list-style: none; margin: 20px 0 0; padding: 0; border: 1px solid var(--line); border-radius: var(--r-tile); overflow: hidden; }
+.files li { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; padding: 14px 18px; border-top: 1px solid var(--line); }
+.files li:first-child { border-top: 0; }
+.files b { font-family: var(--mono); font-size: var(--t-label); font-weight: 500; }
+.files span { grid-column: 1; font-size: var(--t-label); color: var(--muted); }
+.files a.ghost { grid-row: 1 / 3; grid-column: 2; height: 32px; padding: 0 12px; display: inline-flex; align-items: center; border-radius: var(--r-chip); background: var(--wash-3); text-decoration: none; font-size: var(--t-label); font-weight: 500; }
+
+/* toast, as the spec sheet's: top centre, inside the header band */
+.toast { position: fixed; left: 0; right: 0; top: calc(7px + env(safe-area-inset-top)); z-index: 80; width: fit-content; max-width: calc(100% - 32px); margin: 0 auto;
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 14px; border-radius: var(--r-control); background: var(--ink); color: var(--on-ink);
+  font-size: var(--t-ui); font-weight: 500; line-height: 1.5; box-shadow: var(--sh-toast); pointer-events: none;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+.toast svg { width: 16px; height: 16px; }
+.toast.is-enter { opacity: 0; transform: translateY(-12px); }
+.toast[data-closing] { opacity: 0; transform: translateY(-6px); transition-duration: 120ms; }
+
+::highlight(q) { background-color: color-mix(in oklab, var(--accent) 24%, transparent); }
+
+@media (hover: hover) and (pointer: fine) {
+  .top__back:hover, .copybtn:hover, .files a.ghost:hover { background: var(--wash-4); }
+  .btn:hover, .play:hover { background: var(--ink-hover); }
+  .toc a[aria-current="false"]:hover { background: var(--wash-3); color: var(--ink); }
+  .tabs button[aria-selected="false"]:hover { color: var(--ink); }
+  .md td code:hover, .md p code:hover, .md li code:hover { background: var(--wash-6); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition-duration: 1ms; }
+}
+@media (max-width: 1100px) { :root { --toc: 200px; } main { padding: 32px 32px 120px; } .cards { grid-template-columns: 1fr; } }
+@media (max-width: 860px) {
+  :root { --gut: 16px; }
+  .shell { display: block; }
+  .toc { position: sticky; top: var(--top); z-index: 10; height: auto; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--line); background: var(--bg); }
+  .toc__h { display: none; }
+  .toc ol { flex-direction: row; margin: 0; overflow-x: auto; scrollbar-width: none; }
+  .toc ol + .toc__h + ol { display: none; }
+  .toc a { white-space: nowrap; }
+  .toc a span { overflow: visible; }
+  html { scroll-padding-top: calc(var(--top) + 72px); }
+  main { padding: 24px 16px 96px; }
+  .search { width: auto; flex: 1; }
+  .top__sp, .top__title .tag { display: none; }
+  .btn span { display: none; }
+  .btn { padding: 0 10px; }
+}
+@media (max-width: 520px) {
+  .top__title { display: none; }
+  .cards { grid-template-columns: minmax(0, 1fr); }
+  .kv { grid-template-columns: 1fr; }
+  .tok { padding: 18px 16px; }
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="top__back" href="../spec/" aria-label="Back to the spec sheet"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 12H4m0 0 6.5-6.5M4 12l6.5 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <div class="top__title">Motion standard <span class="tag">noon_sas_motion</span></div>
+  <div class="top__sp"></div>
+  <label class="search"><svg viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.6"/><path d="m11 11 3.5 3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <input id="q" type="search" placeholder="Filter values — e.g. stagger, 544, sheet" autocomplete="off" spellcheck="false" aria-label="Filter values" /><kbd>/</kbd></label>
+  <a class="btn" href="noon_sas_motion.skill" download><svg viewBox="0 0 16 16" fill="none"><path d="M8 2v8m0 0 3.2-3.2M8 10 4.8 6.8M3 13.5h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>Download skill</span></a>
+</header>
+
+<div class="shell">
+  <nav class="toc" aria-label="Sections">
+    <p class="toc__h">Standard</p>
+    <ol id="toc"></ol>
+  </nav>
+  <main><div class="wrap" id="doc">
+    <section class="sec" id="core" data-title="Core values">
+      <h2 class="sec__h">Core values</h2>
+      <p class="lede">One spring for everything that moves, two cubic curves for everything that fades. Split every element by property: position, size and scale ride the spring; opacity, blur and colour take the fade; corner radius runs on its own 200 ms clock. Click a curve to play it. The platform you pick applies to every card.</p>
+      <div class="cards" id="cards"></div>
+      <div class="rh" id="rhythm"></div>
+    </section>
+    <div id="docs"></div>
+    <section class="sec" id="files" data-title="Files">
+      <h2 class="sec__h">Files</h2>
+      <p class="lede">The skill lives in this repo at <code>.claude/skills/noon_sas_motion/</code>, so Claude Code picks it up in this project automatically. Elsewhere, unzip the .skill into your project's <code>.claude/skills/</code>. Copy the tokens and helpers rather than re-typing the numbers.</p>
+      <ul class="files" id="fileList"></ul>
+    </section>
+    <p class="empty" id="empty" hidden></p>
+  </div></main>
+</div>
+
+<div id="toasts" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const SKILL = '../.claude/skills/noon_sas_motion/';
+
+  /* ═══ curves ═══ */
+  // step response of a damped spring (mass m): 0 → 1, t in seconds
+  const spring = (k, c, m = 1) => { const w = Math.sqrt(k / m), z = c / (2 * Math.sqrt(k * m));
+    if (z < 1) { const wd = w * Math.sqrt(1 - z * z); return (t) => 1 - Math.exp(-z * w * t) * (Math.cos(wd * t) + (z * w / wd) * Math.sin(wd * t)); }
+    return (t) => 1 - Math.exp(-w * t) * (1 + w * t); };
+  // cubic-bezier(x1, y1, x2, y2) as a function of progress u
+  const bezier = (x1, y1, x2, y2) => { const cx = (t, a, b) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+    return (u) => { if (u <= 0) return 0; if (u >= 1) return 1; let lo = 0, hi = 1, t = u;
+      for (let i = 0; i < 40; i++) { t = (lo + hi) / 2; if (cx(t, x1, x2) < u) lo = t; else hi = t; }
+      return cx(t, y1, y2); }; };
+  const MOVE = spring(280.6, 27.14), SOFT = spring(280.6, 29.08);
+  const FADE_IN = bezier(0.33, 1, 0.68, 1), FADE_OUT = bezier(0.65, 0, 0.35, 1), EXPAND = bezier(0.4, 0.01, 0, 1.01);
+  const MOVE_LINEAR = 'linear(0, 0.0311, 0.1073, 0.2084, 0.3197, 0.4312, 0.5364, 0.6314, 0.7143, 0.7845, 0.8425, 0.8891, 0.9258, 0.9538, 0.9747, 0.9896, 0.9999, 1.0066, 1.0105, 1.0125, 1.013, 1.0126, 1.0116, 1.0103, 1.0088, 1.0074, 1.006, 1.0048, 1.0037, 1.0028, 1.002, 1.0014, 1.001, 1.0006, 1)';
+
+  // ProtoPie-style expression: FUNCTION(Arg value) — function in violet, numbers in the accent
+  const ex = (s) => s.replace(/(-?\d+(?:\.\d+)?)(\s?(?:ms|s|%))?/g, '<span class="n">$1$2</span>');
+
+  /* ═══ core values (from SKILL.md "The standard in one table" + tokens.md §1) ═══ */
+  const PLATFORMS = ['CSS', 'motion/react', 'SwiftUI', 'UIKit', 'Compose', 'Reanimated', 'ProtoPie', 'Figma'];
+  const TOKENS = [
+    { id: 'move', name: 'Move', role: 'Anything that changes position, size or scale — push, sheet, rows, cards, chips, nav, press.',
+      expr: 'SPRING(Tension 300, Friction 28)', f: (u) => MOVE(u * 0.544), dur: 544, demo: 'move', yMax: 1.1,
+      kv: [['Stiffness', '280.6'], ['Damping', '27.14'], ['Mass', '1'], ['ω · ζ', '16.75 · 0.81'], ['Response', '0.375 s'], ['Overshoot', '1.3 % at 320 ms'], ['Within 1 %', '371 ms'], ['Length', '544 ms <small>where ProtoPie ends it</small>', 'wide']],
+      code: {
+        'CSS': `transition: transform 544ms ${MOVE_LINEAR};\n/* = var(--nm-move) 544ms in noon_sas_motion.css */`,
+        'motion/react': `{ type: 'spring', stiffness: 280.6, damping: 27.14, mass: 1 }`,
+        'SwiftUI': `.interpolatingSpring(mass: 1, stiffness: 280.6, damping: 27.14)\n// ≈ .spring(response: 0.375, dampingFraction: 0.81)`,
+        'UIKit': `UISpringTimingParameters(mass: 1, stiffness: 280.6, damping: 27.14, initialVelocity: v)\n// CASpringAnimation: same fields`,
+        'Compose': `spring(dampingRatio = 0.81f, stiffness = 280.6f)\n// View: SpringForce().setStiffness(280.6f).setDampingRatio(0.81f)`,
+        'Reanimated': `withSpring(to, { stiffness: 280.6, damping: 27.14, mass: 1 })`,
+        'ProtoPie': `Spring · Tension 300 · Friction 28   (the panel shows 0.55 s)`,
+        'Figma': `Smart animate → Custom spring: mass 1, stiffness 281, damping 27`,
+      } },
+    { id: 'fade-in', name: 'Fade in', role: 'Opacity in, colour to “on”. 300 ms for a revealed block, 400 ms for a ground, scrim or overlay.',
+      expr: 'EASE-OUT(Cubic, 200ms)', f: FADE_IN, dur: 200, demo: 'fadeIn',
+      kv: [['Curve', 'cubic-bezier(0.33, 1, 0.68, 1)', 'wide'], ['Standard', '200 ms'], ['Block reveal', '300 ms'], ['Ground / scrim', '400 ms'], ['Dark scrim', '480–520 ms']],
+      code: {
+        'CSS': `transition: opacity 200ms cubic-bezier(0.33, 1, 0.68, 1);\n/* var(--nm-fade-in) · 300ms reveal · 400ms ground */`,
+        'motion/react': `{ type: 'tween', duration: 0.2, ease: [0.33, 1, 0.68, 1] }`,
+        'SwiftUI': `.timingCurve(0.33, 1, 0.68, 1, duration: 0.2)`,
+        'UIKit': `UICubicTimingParameters(controlPoint1: CGPoint(x: 0.33, y: 1),\n                         controlPoint2: CGPoint(x: 0.68, y: 1))   // 0.2 s`,
+        'Compose': `tween(durationMillis = 200, easing = CubicBezierEasing(0.33f, 1f, 0.68f, 1f))`,
+        'Reanimated': `withTiming(1, { duration: 200, easing: Easing.out(Easing.cubic) })`,
+        'ProtoPie': `Ease Out · Cubic · 0.2 s`,
+        'Figma': `Custom bezier 0.33, 1, 0.68, 1 · 200ms`,
+      } },
+    { id: 'fade-out', name: 'Fade out', role: 'Opacity out, colour swaps. Exits are faster and quieter than entrances.',
+      expr: 'EASE-IN-OUT(Cubic, 200ms)', f: FADE_OUT, dur: 200, demo: 'fadeOut',
+      kv: [['Curve', 'cubic-bezier(0.65, 0, 0.35, 1)', 'wide'], ['Standard', '200 ms'], ['Long', '300–400 ms'], ['Fast exit', '130–150 ms'], ['Replaced in place', '160 ms <small>new one 260 ms at +40</small>', 'wide']],
+      note: 'ProtoPie stores (0.4, 0, 0.2, 1) in the file but renders (0.65, 0, 0.35, 1). Always use the rendered curve.',
+      code: {
+        'CSS': `transition: opacity 200ms cubic-bezier(0.65, 0, 0.35, 1);\n/* var(--nm-fade-out) */`,
+        'motion/react': `{ type: 'tween', duration: 0.2, ease: [0.65, 0, 0.35, 1] }`,
+        'SwiftUI': `.timingCurve(0.65, 0, 0.35, 1, duration: 0.2)`,
+        'UIKit': `UICubicTimingParameters(controlPoint1: CGPoint(x: 0.65, y: 0),\n                         controlPoint2: CGPoint(x: 0.35, y: 1))   // 0.2 s`,
+        'Compose': `tween(durationMillis = 200, easing = CubicBezierEasing(0.65f, 0f, 0.35f, 1f))`,
+        'Reanimated': `withTiming(0, { duration: 200, easing: Easing.inOut(Easing.cubic) })`,
+        'ProtoPie': `Ease In Out · Cubic · 0.2 s   (file stores 0.4, 0, 0.2, 1 — it renders 0.65, 0, 0.35, 1)`,
+        'Figma': `Custom bezier 0.65, 0, 0.35, 1 · 200ms`,
+      } },
+    { id: 'radius', name: 'Radius', role: 'Corners rounding as a page lifts. Always on its own clock — never on the move spring’s timeline.',
+      expr: 'EASE-IN-OUT(Cubic, 200ms)', f: FADE_OUT, dur: 200, demo: 'radius',
+      kv: [['Clock', '200 ms <small>starts with the move</small>', 'wide'], ['Page-drop spring', 'SPRING(300, 30)', 'wide'], ['Stiffness', '280.6'], ['Damping', '29.08'], ['ζ', '0.87'], ['Overshoot', '0.4 %']],
+      code: {
+        'CSS': `transition: border-radius 200ms cubic-bezier(0.65, 0, 0.35, 1);\n/* page drop: var(--nm-soft) 400ms (Spring 300/30) */`,
+        'motion/react': `{ borderRadius: { type: 'tween', duration: 0.2, ease: [0.65, 0, 0.35, 1] } }\n// page drop: { type: 'spring', stiffness: 280.6, damping: 29.08, mass: 1 }`,
+        'SwiftUI': `.timingCurve(0.65, 0, 0.35, 1, duration: 0.2)\n// page drop: .interpolatingSpring(mass: 1, stiffness: 280.6, damping: 29.08)`,
+        'UIKit': `UICubicTimingParameters(controlPoint1: CGPoint(x: 0.65, y: 0),\n                         controlPoint2: CGPoint(x: 0.35, y: 1))   // 0.2 s`,
+        'Compose': `tween(durationMillis = 200, easing = CubicBezierEasing(0.65f, 0f, 0.35f, 1f))\n// page drop: spring(dampingRatio = 0.87f, stiffness = 280.6f)`,
+        'Reanimated': `withTiming(r, { duration: 200, easing: Easing.inOut(Easing.cubic) })\n// page drop: withSpring(r, { stiffness: 280.6, damping: 29.08, mass: 1 })`,
+        'ProtoPie': `Radius · Ease In Out · Cubic · 0.2 s\n(page lifting as a top sheet: Spring · Tension 300 · Friction 30)`,
+        'Figma': `Custom bezier 0.65, 0, 0.35, 1 · 200ms`,
+      } },
+    { id: 'expand', name: 'Expand', role: 'A card scaling up into a full page (80 → 100 %). Slow start, decisive landing.',
+      expr: 'CURVE(0.4, 0.01, 0, 1.01, 400ms)', f: EXPAND, dur: 400, demo: 'expand',
+      kv: [['Curve', 'cubic-bezier(0.4, 0.01, 0, 1.01)', 'wide'], ['Duration', '400 ms'], ['Scale', '80 → 100 %'], ['Radius', '→ 0 in 200 ms', 'wide']],
+      code: {
+        'CSS': `transition: transform 400ms cubic-bezier(0.4, 0.01, 0, 1.01);\n/* var(--nm-expand) · scale(0.8) → scale(1) */`,
+        'motion/react': `{ type: 'tween', duration: 0.4, ease: [0.4, 0.01, 0, 1.01] }`,
+        'SwiftUI': `.timingCurve(0.4, 0.01, 0, 1.01, duration: 0.4)`,
+        'UIKit': `UICubicTimingParameters(controlPoint1: CGPoint(x: 0.4, y: 0.01),\n                         controlPoint2: CGPoint(x: 0, y: 1.01))   // 0.4 s`,
+        'Compose': `tween(durationMillis = 400, easing = CubicBezierEasing(0.4f, 0.01f, 0f, 1.01f))`,
+        'Reanimated': `withTiming(1, { duration: 400, easing: Easing.bezier(0.4, 0.01, 0, 1.01) })`,
+        'ProtoPie': `Custom bezier 0.4, 0.01, 0, 1.01 · 0.4 s`,
+        'Figma': `Custom bezier 0.4, 0.01, 0, 1.01 · 400ms`,
+      } },
+    { id: 'keyboard', name: 'Keyboard lift', role: 'The keyboard rising, and whatever rides it (a footer, a field settling). Also the sheet close and ticker step.',
+      expr: 'CURVE(0.32, 0.72, 0, 1, 450ms)', f: bezier(0.32, 0.72, 0, 1), dur: 450, demo: 'move',
+      kv: [['Curve', 'cubic-bezier(0.32, 0.72, 0, 1)', 'wide'], ['Keyboard', '450 ms'], ['Sheet close', '280 ms'], ['Ticker step', '500 ms']],
+      code: {
+        'CSS': `transition: transform 450ms cubic-bezier(0.32, 0.72, 0, 1);\n/* var(--nm-ios) */`,
+        'motion/react': `{ type: 'tween', duration: 0.45, ease: [0.32, 0.72, 0, 1] }`,
+        'SwiftUI': `.timingCurve(0.32, 0.72, 0, 1, duration: 0.45)`,
+        'UIKit': `UICubicTimingParameters(controlPoint1: CGPoint(x: 0.32, y: 0.72),\n                         controlPoint2: CGPoint(x: 0, y: 1))   // 0.45 s`,
+        'Compose': `tween(durationMillis = 450, easing = CubicBezierEasing(0.32f, 0.72f, 0f, 1f))`,
+        'Reanimated': `withTiming(to, { duration: 450, easing: Easing.bezier(0.32, 0.72, 0, 1) })`,
+        'ProtoPie': `Custom bezier 0.32, 0.72, 0, 1 · 0.45 s`,
+        'Figma': `Custom bezier 0.32, 0.72, 0, 1 · 450ms`,
+      } },
+  ];
+  const RHYTHM = [
+    { name: 'Press', kv: [['Controls', 'scale 0.96'], ['CTAs, wide rows, cards', 'scale 0.98'], ['Icons', 'scale 0.90–0.94'], ['Press in', '70–100 ms, or the kit press spring 500 / 30 / m 0.6'], ['Release', 'on the move spring'], ['Selection dip', '1 → 0.96 → 1 over 340 ms']] },
+    { name: 'Stagger', kv: [['In', '60 ms · top → bottom, left → right'], ['Out', '40 ms · bottom → top'], ['Micro', '20 ms'], ['Chip re-flow', '10 ms'], ['Fast exit before a page', '25 ms, 12 px']] },
+    { name: 'Follow-up beat', kv: [['Heading after its card', '+40 ms'], ['Secondary layer', '+40–80 ms'], ['Dependent content', '+100 ms <small>focus, results after a push</small>'], ['After a page has gone', '+600 ms']] },
+    { name: 'Travel', kv: [['Rows, blocks', '20 px'], ['Cards', '16 px'], ['Headings', '10 px'], ['Chip drop', '20 px'], ['Replaced in place', '5 px lift, blur 2 px'], ['Nav rise', 'its own height']] },
+    { name: 'Screen push', kv: [['Incoming page', 'x 100 % → 0 on the move spring'], ['Page under', 'x 0 → −52.36 % <small>(200 / 382)</small>'], ['Dim', 'none'], ['Edge-swipe strip', '24 px'], ['Under reduced motion', 'cross-fade ≤ 200 ms']] },
+    { name: 'Haptic', kv: [['Moves a page or sheet', 'iOS Impact Medium'], ['Automatic beats, swaps', 'iOS Impact Light'], ['Android', 'Normal'], ['Rule', 'one per beat, only with a visible change']] },
+  ];
+
+  /* ═══ plots ═══ */
+  const NS = 'http://www.w3.org/2000/svg';
+  function plotSVG(f, { w = 420, h = 132, pad = [14, 12, 22, 12], yMin = -0.04, yMax = 1.08, n = 160, labels } = {}) {
+    const [pt, pr, pb, pl] = pad, X = (u) => pl + u * (w - pl - pr), Y = (v) => pt + (1 - (v - yMin) / (yMax - yMin)) * (h - pt - pb);
+    let d = ''; for (let i = 0; i <= n; i++) { const u = i / n; d += (i ? 'L' : 'M') + X(u).toFixed(1) + ' ' + Y(f(u)).toFixed(1); }
+    const lab = labels ? `<text class="ax" x="${pl}" y="${h - 6}">0</text><text class="ax" x="${w - pr}" y="${h - 6}" text-anchor="end">${labels}</text>` : '';
+    return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" aria-hidden="true">
+      <line x1="${pl}" x2="${w - pr}" y1="${Y(1)}" y2="${Y(1)}" stroke="var(--line-strong)" vector-effect="non-scaling-stroke"/>
+      <line x1="${pl}" x2="${w - pr}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line-strong)" vector-effect="non-scaling-stroke"/>
+      <path d="${d}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+      ${lab}<circle class="mk" r="4.5" cx="${X(0)}" cy="${Y(f(0))}" fill="var(--accent)" stroke="#fff" stroke-width="2" opacity="0"/></svg>`;
+  }
+  const markerPos = (svg, u, v, { w = 420, h = 132, pad = [14, 12, 22, 12], yMin = -0.04, yMax = 1.08 } = {}) => {
+    const [pt, pr, pb, pl] = pad; const c = svg.querySelector('.mk');
+    c.setAttribute('cx', pl + u * (w - pl - pr)); c.setAttribute('cy', pt + (1 - (v - yMin) / (yMax - yMin)) * (h - pt - pb)); };
+
+  /* ═══ platform choice (shared by every card; remembered per viewer) ═══ */
+  let platform = 'CSS';
+  try { const p = localStorage.getItem('nm-platform'); if (PLATFORMS.includes(p)) platform = p; } catch (e) {}
+  function setPlatform(p) {
+    platform = p; try { localStorage.setItem('nm-platform', p); } catch (e) {}
+    document.querySelectorAll('.tok[data-tok]').forEach((card) => {
+      const t = TOKENS.find((x) => x.id === card.dataset.tok);
+      card.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.p === p)));
+      card.querySelector('.code pre').textContent = t.code[p] || '—';
+    });
+  }
+
+  /* ═══ render the core cards ═══ */
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  const PLAY = '<svg viewBox="0 0 16 18"><path d="M1 1.5v15L15 9z" fill="currentColor"/></svg>';
+  const kvHTML = (kv) => `<dl class="kv">${kv.map(([k, v, cls]) => `<div${cls ? ` class="${cls}"` : ''}><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
+  $('cards').innerHTML = TOKENS.map((t) => `
+    <article class="tok" data-tok="${t.id}" id="core-${t.id}">
+      <div class="tok__head"><h3>${t.name}</h3></div>
+      <p class="tok__role">${t.role}</p>
+      <span class="x">${ex(t.expr)}</span>
+      <div class="plot" role="button" tabindex="0" aria-label="Play ${t.name}">${plotSVG(t.f, { yMax: t.yMax || 1.08, labels: t.dur + 'ms' })}</div>
+      <div class="demo"><button class="play" aria-label="Play ${t.name}">${PLAY}</button><div class="lane${t.demo === 'move' ? '' : t.demo === 'radius' || t.demo === 'expand' ? ' lane--box' : ' lane--center'}"><i></i></div></div>
+      ${kvHTML(t.kv)}
+      ${t.note ? `<p class="tok__role" style="margin-top:-4px">${t.note}</p>` : ''}
+      <div class="tabs" role="tablist" aria-label="Platform">${PLATFORMS.map((p) => `<button role="tab" data-p="${p}" aria-selected="false">${p}</button>`).join('')}</div>
+      <div class="code"><pre></pre><button class="copybtn">Copy</button></div>
+    </article>`).join('');
+  $('rhythm').innerHTML = RHYTHM.map((r) => `<article class="tok"><div class="tok__head"><h3>${r.name}</h3></div>${kvHTML(r.kv)}</article>`).join('');
+  setPlatform(platform);
+
+  // play a card: the marker rides the curve while the demo square does the property
+  const running = new WeakMap();
+  function play(card) {
+    const t = TOKENS.find((x) => x.id === card.dataset.tok), svg = card.querySelector('.plot svg'), dot = card.querySelector('.lane i'), lane = card.querySelector('.lane');
+    const travel = lane.clientWidth - 32, opts = { yMax: t.yMax || 1.08 };
+    const apply = (v) => {
+      if (t.demo === 'move') dot.style.transform = `translateX(${(v * travel).toFixed(2)}px)`;
+      else if (t.demo === 'fadeIn') dot.style.opacity = v;
+      else if (t.demo === 'fadeOut') dot.style.opacity = 1 - v;
+      else if (t.demo === 'radius') dot.style.borderRadius = (v * 12).toFixed(2) + 'px';
+      else if (t.demo === 'expand') dot.style.transform = `scale(${(0.8 + 0.2 * v).toFixed(4)})`;
+    };
+    cancelAnimationFrame(running.get(card));
+    svg.querySelector('.mk').setAttribute('opacity', '1');
+    const t0 = performance.now();
+    const step = (now) => {
+      const u = Math.min(1, (now - t0) / t.dur), v = u >= 1 ? 1 : t.f(u);
+      markerPos(svg, u, v, opts); apply(v);
+      if (u < 1) running.set(card, requestAnimationFrame(step));
+    };
+    apply(0); running.set(card, requestAnimationFrame(step));
+  }
+  // demo squares rest at their start state
+  document.querySelectorAll('.tok[data-tok]').forEach((card) => {
+    const t = TOKENS.find((x) => x.id === card.dataset.tok), dot = card.querySelector('.lane i');
+    if (t.demo === 'fadeIn') dot.style.opacity = 0;
+    if (t.demo === 'expand') dot.style.transform = 'scale(0.8)';
+  });
+  $('cards').addEventListener('click', (e) => {
+    const card = e.target.closest('.tok'); if (!card) return;
+    const tab = e.target.closest('.tabs button'); if (tab) { setPlatform(tab.dataset.p); return; }
+    if (e.target.closest('.copybtn')) { copy(card.querySelector('.code pre').textContent, e.target.closest('.copybtn')); return; }
+    if (e.target.closest('.play, .plot')) play(card);
+  });
+  $('cards').addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target.matches('.plot')) { e.preventDefault(); play(e.target.closest('.tok')); } });
+
+  /* ═══ copy + toast ═══ */
+  const CHECK = '<svg viewBox="0 0 16 16" fill="none"><path d="m3.5 8.5 3 3 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  let toastEl = null, toastT = 0;
+  function toast(msg) {
+    if (toastEl) toastEl.remove();
+    const el = document.createElement('div'); el.className = 'toast is-enter'; el.innerHTML = CHECK + '<span></span>'; el.lastChild.textContent = msg;
+    $('toasts').appendChild(el); void el.offsetWidth; el.classList.remove('is-enter'); toastEl = el;
+    clearTimeout(toastT); toastT = setTimeout(() => { el.dataset.closing = ''; setTimeout(() => el.remove(), 140); if (toastEl === el) toastEl = null; }, 2200);
+  }
+  async function copy(text, btn) {
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (e) {
+      const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+      try { ok = document.execCommand('copy'); } catch (e2) {} ta.remove(); }
+    if (btn && ok) { const was = btn.textContent; btn.textContent = 'Copied'; setTimeout(() => { btn.textContent = was; }, 1500); }
+    toast(ok ? (text.length > 44 ? 'Copied' : `Copied ${text}`) : 'Couldn’t copy');
+  }
+
+  /* ═══ the skill's markdown, rendered ═══ */
+  const DOCS = [
+    { id: 'overview', file: 'SKILL.md', nav: 'Overview' },
+    { id: 'tokens', file: 'references/tokens.md', nav: 'Tokens' },
+    { id: 'choreography', file: 'references/choreography.md', nav: 'Choreography' },
+    { id: 'gestures', file: 'references/gestures.md', nav: 'Gestures' },
+    { id: 'haptics', file: 'references/haptics.md', nav: 'Haptics' },
+    { id: 'implementation', file: 'references/implementation.md', nav: 'Implementation' },
+    { id: 'edge-cases', file: 'references/edge-cases.md', nav: 'Edge cases & QA' },
+    { id: 'protopie', file: 'references/protopie.md', nav: 'ProtoPie' },
+    { id: 'taste', file: 'references/taste.md', nav: 'Taste log' },
+    { id: 'sources', file: 'references/sources.md', nav: 'Sources' },
+  ];
+  const slug = (s) => s.toLowerCase().trim().replace(/[^\p{L}\p{N}\s_-]/gu, '').replace(/\s/g, '-');   // GitHub's heading anchors
+  const docOf = (href) => { const m = href.match(/(?:^|\/)([\w-]+)\.md$/i); if (!m) return null; const d = DOCS.find((x) => x.file.endsWith(m[1] + '.md')); return d ? d.id : null; };
+
+  function prepSkillMd(md) {
+    return md.replace(/^---[\s\S]*?\n---\n/, '')         // frontmatter
+             .replace(/^# .*\n/m, '')                     // its title (the section heading stands in)
+             .replace(/\n## References[\s\S]*$/, '\n');   // the file index — the contents rail is the index here
+  }
+  function renderDoc(d, md) {
+    const sec = document.createElement('section');
+    sec.className = 'sec'; sec.id = d.id; sec.dataset.title = d.nav;
+    let title = d.nav;
+    if (d.id === 'overview') md = prepSkillMd(md);
+    else { const m = md.match(/^# (.*)\n/); if (m) { title = m[1]; md = md.replace(/^# .*\n/, ''); } }
+    sec.innerHTML = `<h2 class="sec__h"></h2><p class="sec__src"><a href="${SKILL}${d.file}" target="_blank" rel="noopener">${d.file}</a></p><div class="md"></div>`;
+    sec.querySelector('.sec__h').textContent = title;
+    const body = sec.querySelector('.md');
+    body.innerHTML = marked.parse(md, { gfm: true });
+    // headings one level down (the section owns h2); GitHub-style ids, prefixed by the doc
+    body.querySelectorAll('h1, h2, h3, h4').forEach((h) => {
+      const n = document.createElement('h' + Math.min(5, +h.tagName[1] + 1)); n.innerHTML = h.innerHTML; n.id = `${d.id}--${slug(h.textContent)}`; h.replaceWith(n); });
+    // links between the skill's files become links within this page
+    body.querySelectorAll('a[href]').forEach((a) => {
+      const href = a.getAttribute('href');
+      if (/^https?:/.test(href)) { a.target = '_blank'; a.rel = 'noopener'; return; }
+      const [file, hash] = href.split('#'), target = file ? docOf(file) : d.id;
+      if (target) a.setAttribute('href', '#' + (hash ? `${target}--${hash}` : target));
+    });
+    body.querySelectorAll('table').forEach((t) => { const w = document.createElement('div'); w.className = 'tw'; t.replaceWith(w); w.appendChild(t); });
+    body.querySelectorAll('pre').forEach((p) => { const w = document.createElement('div'); w.className = 'code'; p.replaceWith(w); w.appendChild(p);
+      const b = document.createElement('button'); b.className = 'copybtn'; b.textContent = 'Copy'; w.appendChild(b); });
+    addMiniPlots(body);
+    return sec;
+  }
+
+  // spring library + named easing tables get a small curve per row, all on the same 0–1000 ms / 0–1 scale
+  function addMiniPlots(body) {
+    body.querySelectorAll('table').forEach((t) => {
+      const head = [...t.querySelectorAll('thead th')].map((th) => th.textContent.trim());
+      const kc = head.indexOf('k / c'), cb = head.indexOf('cubic-bezier');
+      if (kc < 0 && cb < 0) return;
+      const th = document.createElement('th'); th.textContent = 'Curve'; t.querySelector('thead tr').prepend(th);
+      t.querySelectorAll('tbody tr').forEach((tr) => {
+        const td = document.createElement('td'); td.className = 'mini'; tr.prepend(td);
+        const cell = tr.children[(kc >= 0 ? kc : cb) + 1].textContent;
+        let f = null, yMax = 1.1;
+        if (kc >= 0) {
+          const m = cell.match(/([\d.]+)\s*\/\s*([\d.]+)(?:.*?m\s*([\d.]+))?/); if (!m) return;
+          const s = spring(+m[1], +m[2], m[3] ? +m[3] : 1); f = (u) => s(u); yMax = 1.36; td.classList.add('is-tall');
+        } else {
+          const m = cell.match(/\(\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+),\s*(-?[\d.]+)\s*\)/);
+          if (m) { f = bezier(+m[1], +m[2], +m[3], +m[4]); yMax = Math.max(1.1, +m[2] + 0.05, +m[4] + 0.05); }
+          else if (/^\s*—\s*$/.test(cell)) f = (u) => u;
+          else return;
+        }
+        td.innerHTML = plotSVG(f, { w: 76, h: 30, pad: [3, 2, 3, 2], yMin: -0.06, yMax, n: 60 }).replace('<circle', '<circle display="none"');
+      });
+    });
+  }
+
+  /* ═══ contents rail ═══ */
+  function renderToc() {
+    const secs = [...document.querySelectorAll('#doc > .sec, #docs > .sec')];
+    $('toc').innerHTML = secs.map((s) => `<li><a href="#${s.id}" data-sec="${s.id}" aria-current="false"><span>${s.dataset.title}</span><em class="count" hidden></em></a></li>`).join('');
+    const links = new Map([...$('toc').querySelectorAll('a')].map((a) => [a.dataset.sec, a]));
+    const seen = new Map();
+    const io = new IntersectionObserver((ents) => {
+      ents.forEach((e) => seen.set(e.target.id, e.isIntersecting));
+      const cur = secs.find((s) => seen.get(s.id) && !s.hidden) || null;
+      if (cur) links.forEach((a, id) => a.setAttribute('aria-current', String(id === cur.id)));
+    }, { rootMargin: '-80px 0px -60% 0px' });
+    secs.forEach((s) => io.observe(s));
+    links.get('core').setAttribute('aria-current', 'true');
+  }
+
+  /* ═══ filter: rows, list items, paragraphs and cards that don't match hide; matches are highlighted ═══ */
+  let blocks = [];
+  function indexBlocks() {
+    blocks = [];
+    document.querySelectorAll('#cards > .tok, #rhythm > .tok').forEach((el) => blocks.push({ el, sec: 'core' }));
+    document.querySelectorAll('#docs .md').forEach((md) => {
+      const sec = md.closest('.sec').id;
+      md.querySelectorAll('tbody tr, li, pre').forEach((el) => blocks.push({ el, sec }));
+      md.querySelectorAll('p').forEach((el) => { if (!el.closest('li')) blocks.push({ el, sec }); });
+    });
+    blocks.forEach((b) => { b.text = b.el.textContent.toLowerCase(); });
+  }
+  function groupVisible(el) {
+    if (el.hidden) return false;
+    if (el.matches('.tw')) return [...el.querySelectorAll('tbody tr')].some((r) => !r.hidden);
+    if (el.matches('ul, ol')) return [...el.children].some((li) => !li.hidden);
+    if (el.matches('.code')) return !el.querySelector('pre').hidden;
+    return true;
+  }
+  function applyFilter() {
+    const q = $('q').value.trim().toLowerCase();
+    const counts = {};
+    blocks.forEach((b) => { const hit = !q || b.text.includes(q); b.el.hidden = !hit; if (hit && q) counts[b.sec] = (counts[b.sec] || 0) + 1; });
+    // inside each doc: hide tables / lists with nothing left, then headings with nothing under them
+    document.querySelectorAll('#docs .md').forEach((md) => {
+      md.querySelectorAll('.tw, ul, ol').forEach((g) => { g.hidden = false; });
+      if (q) {
+        [...md.querySelectorAll('ul, ol')].reverse().forEach((g) => { g.hidden = ![...g.children].some((li) => !li.hidden); });
+        md.querySelectorAll('.tw').forEach((g) => { g.hidden = ![...g.querySelectorAll('tbody tr')].some((r) => !r.hidden); });
+      }
+      const kids = [...md.children]; let head = null, any = false;
+      const close = () => { if (head) head.hidden = !!q && !any; };
+      kids.forEach((k) => { if (/^H[3-5]$/.test(k.tagName)) { close(); head = k; any = false; } else if (groupVisible(k)) any = true; });
+      close();
+    });
+    document.querySelectorAll('#doc > .sec, #docs > .sec').forEach((s) => {
+      if (s.id === 'files') { s.hidden = !!q; return; }
+      s.hidden = !!q && !counts[s.id];
+      if (s.id === 'core') s.querySelector('.lede').hidden = !!q;
+    });
+    $('toc').querySelectorAll('a').forEach((a) => {
+      const n = counts[a.dataset.sec] || 0, c = a.querySelector('.count');
+      c.hidden = !q || !n; c.textContent = n; a.classList.toggle('is-empty', !!q && !n);
+    });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    $('empty').hidden = !q || total > 0;
+    $('empty').textContent = `Nothing in the standard matches “${$('q').value.trim()}”.`;
+    highlight(q);
+  }
+  function highlight(q) {
+    if (!window.CSS || !CSS.highlights) return;
+    CSS.highlights.delete('q'); if (!q) return;
+    const ranges = [], walk = document.createTreeWalker($('doc'), NodeFilter.SHOW_TEXT);
+    for (let n; (n = walk.nextNode());) {
+      const p = n.parentElement; if (!p || p.closest('[hidden], svg, .tabs, script')) continue;
+      const s = n.data.toLowerCase(); let i = s.indexOf(q);
+      while (i > -1 && ranges.length < 2000) { const r = new Range(); r.setStart(n, i); r.setEnd(n, i + q.length); ranges.push(r); i = s.indexOf(q, i + q.length); }
+    }
+    CSS.highlights.set('q', new Highlight(...ranges));
+  }
+  let ft = 0;
+  $('q').addEventListener('input', () => { clearTimeout(ft); ft = setTimeout(() => { applyFilter(); if ($('q').value.trim()) window.scrollTo({ top: 0 }); }, 90); });
+  $('q').addEventListener('keydown', (e) => { if (e.key === 'Escape') { $('q').value = ''; applyFilter(); $('q').blur(); } });
+  addEventListener('keydown', (e) => { if (e.key === '/' && !e.target.closest('input, textarea')) { e.preventDefault(); $('q').focus(); } });
+
+  // click a value to copy it; code blocks have their own Copy button
+  $('docs').addEventListener('click', (e) => {
+    const b = e.target.closest('.copybtn'); if (b) { copy(b.previousElementSibling.textContent, b); return; }
+    const c = e.target.closest('.md code'); if (c && !c.closest('pre') && !getSelection().toString()) copy(c.textContent);
+  });
+
+  /* ═══ files ═══ */
+  const FILES = [
+    ['noon_sas_motion.skill', 'The whole skill as one archive — unzip into .claude/skills/', 'noon_sas_motion.skill'],
+    ['SKILL.md', 'The standard, the which-motion table, the rules', SKILL + 'SKILL.md'],
+    ['assets/noon_sas_motion.css', 'Drop-in CSS tokens: --nm-move, fades, radius, stagger, press, shake, shimmer', SKILL + 'assets/noon_sas_motion.css'],
+    ['assets/noon_sas_motion.js', 'Springs, spring → linear(), WAAPI spring keyframes, stop / commit, haptics', SKILL + 'assets/noon_sas_motion.js'],
+    ['scripts/spring.py', 'Prints any spring in every platform format, plus its linear()', SKILL + 'scripts/spring.py'],
+    ['scripts/pp_extract.py', 'Pulls a shared ProtoPie pie’s authored settings and fits its recordings', SKILL + 'scripts/pp_extract.py'],
+  ];
+  $('fileList').innerHTML = FILES.map(([name, what, href]) => `<li><b>${name}</b><span>${what}</span><a class="ghost" href="${href}" download>Download</a></li>`).join('');
+
+  /* ═══ load ═══ */
+  (async () => {
+    const host = $('docs');
+    const texts = await Promise.all(DOCS.map((d) => fetch(SKILL + d.file).then((r) => (r.ok ? r.text() : Promise.reject(r.status))).catch(() => null)));
+    DOCS.forEach((d, i) => {
+      if (texts[i] == null || !window.marked) {
+        const s = document.createElement('section'); s.className = 'sec'; s.id = d.id; s.dataset.title = d.nav;
+        s.innerHTML = `<h2 class="sec__h">${d.nav}</h2><p class="lede">Couldn’t load <code>${d.file}</code> — open it <a href="${SKILL}${d.file}">directly</a>.</p>`;
+        host.appendChild(s); return;
+      }
+      host.appendChild(renderDoc(d, texts[i]));
+    });
+    renderToc(); indexBlocks();
+    if (location.hash) { const t = document.getElementById(decodeURIComponent(location.hash.slice(1))); if (t) t.scrollIntoView(); }
+  })();
+})();
+</script>
+</body>
+</html>

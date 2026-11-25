@@ -52,3 +52,22 @@ Live: https://vivid-badger.noonprototype.com/ (app 89, deploy region europe-west
 
 
 `npm run package` builds and writes `noon-web-pdp-deploy.zip`, which has `Dockerfile`, `nginx.conf.template` and `dist/` at the top level. It serves the static build with nginx on `$PORT`, per the platform contract (Cloud Run behind IAP). The zip is a build artifact and is gitignored. Deploy it through the `noon-prototype` MCP server: `register_app` → `create_source_upload` → PUT the zip → `finalize_source_upload` → `deploy_app`. You can also upload it on the site under New App.
+
+## Dev handoff: animation spec sheet
+
+`/spec/` is the image view's animation spec for developers, and the **Spec** pill next to Variants opens it on the iteration that's showing. It's the spec-sheet page from `saswata2002/product-upscale` (the engine is copied unchanged apart from the two fixes below), configured for this prototype in its `<script id="spec-config">` block (`public/spec/index.html`).
+
+- It loads the real prototype in a hidden frame on a virtual clock, records one play of each scene, and then lets you scrub it frame by frame. The display is a static copy, so the prototype itself is never edited.
+- **Scenes:** 00 Overview, 01 Open photo, 02 Next photo, 03 Next review, 04 Portrait → landscape, 05 Open gallery, 06 Pick from gallery, 07 View all, 08 Close, 09 Gallery label folds, 10 Gallery button hover, 11 Gallery tile hover, 12 Mark helpful.
+- **Iterations:** 01 Mask (`/?photoSwap=mask`) and 02 Slide (`/?photoSwap=slide`), picked in the header (`?v=1|2&s=<scene>`).
+- **Values:** every value comes from `src/viewer/*` (PhotoViewer, SlideStrip, PhotoGrid, GalleryButton, viewer.css), measured on a 1440×900 window. When an animation changes in code, update the matching row in the config.
+- **Hover:** a script can't hover, so `[data-spec-hover]` on `.pv__galleryBtn` / `.pv__tile` plays the hover states (see viewer.css).
+- **Variants widget:** it hides itself in the spec's frames (`?spec=` in the URL).
+- **Engine fixes (worth sending upstream):**
+  - The page's own scroll position is recorded, so scenes set up below the fold show there.
+  - Every attribute change is recorded, not just `style`/`class`/`hidden`. That replays states kept in `data-*`/`aria-*`, such as `[data-labelled]` and `[aria-current]`.
+  - A failed recording is logged to the console.
+
+`/motion/` is the noon motion standard (the `noon_sas_motion` skill as a reference page). Its markdown is served from `public/.claude/skills/noon_sas_motion/`.
+
+In `npm run dev` / `vite preview`, a small Vite plugin maps `/spec/` and `/motion/` to their `index.html`. In production, nginx serves the folder index (`absolute_redirect off` keeps `/spec` → `/spec/` relative).

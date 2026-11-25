@@ -3,6 +3,8 @@ server {
   server_name _;
   root /usr/share/nginx/html;
   index index.html;
+  # /spec → /spec/ etc. stay relative, so the redirect never points at the container's own port
+  absolute_redirect off;
 
   gzip on;
   gzip_types text/css application/javascript application/json image/svg+xml;

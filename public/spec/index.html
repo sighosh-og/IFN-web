@@ -1,0 +1,1355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Image View Spec</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&family=Geist+Mono:wght@400..600&display=swap" rel="stylesheet" />
+<style>
+/* Animation spec sheet for a prototype's whole interaction flow (scenes come from window.SPEC).
+   Same layout as a ProtoPie recording view: canvas (flow → layers tree · live preview · inspector · playback)
+   over a timeline of property tracks — light bar = delay, dark bar = duration.
+   The preview is the real prototype in an iframe; this page only drives it (it never edits it).
+
+   Styled with Lightweight UI v0.2.0 (lightweight-ui-kit.vercel.app), the internal-tools kit:
+   Geist / Geist Mono, ink on paper with ink washes for every hover and fill, colour only for
+   meaning, corners that grow with the object (smoothed with corner-shape), soft shadows only on
+   things that float, one ease-out curve. Light theme only. */
+:root {
+  /* ── kit colour ── */
+  --bg: #ffffff;
+  --card: #ffffff;
+  --ink: #18191d;
+  --on-ink: #ffffff;
+  --muted: #666879;
+  --line: #ededec;
+  --line-strong: #e3e3e0;
+  --line-control: #949494;
+  --wash-1: color-mix(in oklab, var(--ink) 1.5%, transparent);
+  --wash-2: color-mix(in oklab, var(--ink) 3%, transparent);
+  --wash-3: color-mix(in oklab, var(--ink) 4%, transparent);
+  --wash-4: color-mix(in oklab, var(--ink) 6%, transparent);
+  --wash-5: color-mix(in oklab, var(--ink) 8%, transparent);
+  --wash-6: color-mix(in oklab, var(--ink) 12%, transparent);
+  --ink-hover: color-mix(in oklab, var(--ink) 88%, var(--bg));
+  --draft: #96660b; --draft-bg: #fbf3e3;
+  --accent: #ec642b;   /* the internal-tools orange — playhead, its trail, the record dot */
+  --chart-1: #277fff;
+  --fn: #7c5cff;     /* easing function names, as ProtoPie colours them */
+  --live: #e5484d;   /* the value at the playhead */
+
+  /* ── spec-sheet roles, mapped onto the kit ── */
+  --canvas: color-mix(in oklab, #18191d 3%, #ffffff);
+  --dot: color-mix(in oklab, var(--ink) 9%, transparent);
+  --ink-2: var(--muted); --ink-3: var(--muted);          /* the kit has one secondary text colour */
+  --row: var(--wash-2); --row-hover: var(--wash-4);
+  --delay: var(--wash-6); --dur: var(--ink); --dur-ink: var(--on-ink);
+  --head: var(--accent);
+
+  /* ── kit radius (named by object) ── */
+  --r-xs: 6px; --r-lg: 8px; --r-chip: 10px; --r-xl: 12px; --r-control: 14px; --r-2xl: 16px; --r-tile: 20px; --r-panel: 22px;
+  --r-full: 999px;
+
+  /* ── kit shadow ── */
+  --sh-card: 0 1px 2px rgb(0 0 0 / .04);   /* floating cards: the hairline does the edge, the shadow only a whisper of lift */
+  --sh-toast: 0 12px 32px -12px rgb(0 0 0 / .32);
+  --sh-pill: 0 1px 2px rgb(0 0 0 / .06), 0 1px 1px rgb(0 0 0 / .04);
+  --sh-device: 0 0 0 1px rgb(0 0 0 / .06), 0 1px 2px rgb(0 0 0 / .03), 0 24px 60px -24px rgb(0 0 0 / .35);
+
+  /* ── kit motion ── */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --d-press: 160ms; --d-swap: 180ms; --d-popover: 150ms;
+
+  /* ── kit type (named by job) ── */
+  --sans: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --mono: 'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --t-micro: 11px; --t-caption: 12px; --t-label: 13px; --t-ui: 14px; --t-body: 15px; --t-title: 17px;
+
+  /* ── layout ── */
+  --gut: 28px; --card-w: 360px;
+  --stage-pad: 52px;   /* extra room above and below the phone, so it sits smaller and calmer on the stage */
+  --lab: 320px; --rowh: 24px; --rowgap: 14px;
+  --tl-pt: 20px; --tl-pr: 32px; --tl-pb: 28px;
+
+  color-scheme: light;
+}
+
+/* The kit's corners are drawn with superellipse(4). Safari and Firefox can't, and would draw the
+   full radius as a circle, so there they shrink to the plain-rounding equivalent (×0.15). */
+* { box-sizing: border-box; corner-shape: superellipse(4); }
+@supports not (corner-shape: round) {
+  :root { --r-xs: .9px; --r-lg: 1.2px; --r-chip: 1.5px; --r-xl: 1.8px; --r-control: 2.1px; --r-2xl: 2.4px; --r-tile: 3px; --r-panel: 3.3px; --r-full: 2.4px; }
+}
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: var(--t-label); line-height: 1.5; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+svg { flex: none; }
+.num, .len, .tick, .bar, .ctrl__state, .insp dd { font-variant-numeric: tabular-nums; }
+
+/* Press feedback, as the kit's u-press: pressables shrink to 97% while held. */
+.top__back, .top__std, .copy, .ctrl button, .insp__go, .flow li button, .anims button {
+  transition: transform var(--d-press) var(--ease-out), background-color var(--d-press) var(--ease-out), color var(--d-press) var(--ease-out), box-shadow var(--d-press) var(--ease-out);
+}
+.top__back:active, .top__std:active, .copy:active, .ctrl button:active, .insp__go:active { transform: scale(.97); }
+/* wide rows dim instead: 3% of a full-width row moves its edges too far */
+.flow li button:active, .anims button:active { opacity: .7; }
+
+/* ── section head: 11px semibold caps, the kit's sidebar label ── */
+.eyebrow, .grp b, .insp__eyebrow { margin: 0; font-size: var(--t-micro); font-weight: 600; letter-spacing: .08em; line-height: 1.5; text-transform: uppercase; color: var(--muted); }
+/* a count chip clubbed to its section head (as in the A/B library's "Customer 16"): a wash, muted semibold figures */
+.count { display: inline-grid; place-items: center; min-width: 20px; height: 18px; padding: 0 6px; border-radius: var(--r-xs); background: var(--wash-4); font-family: var(--sans); font-size: var(--t-micro); font-weight: 600; line-height: 1; color: var(--muted); letter-spacing: 0; text-transform: none; font-variant-numeric: tabular-nums; }
+
+/* ── top bar ── */
+.top { height: 56px; display: flex; align-items: center; gap: 12px; padding: 0 var(--gut) 0 18px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.top__back { width: 32px; height: 32px; display: grid; place-items: center; border-radius: var(--r-chip); text-decoration: none; flex: none; color: var(--ink); }
+.top__back svg { width: 18px; height: 18px; }
+.top__title { font-size: var(--t-body); font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.top__sp { flex: 1; }
+/* ghost button to the motion standard (/motion/) — every value the springs and curves here come from */
+.top__std { height: 36px; padding: 0 12px; display: inline-flex; align-items: center; border-radius: var(--r-control); background: var(--wash-3); font-size: var(--t-ui); font-weight: 500; text-decoration: none; white-space: nowrap; flex: none; }
+
+/* Primary button, md: ink fill, 14px medium, 14px corner. The one primary action on the page. */
+.copy, .insp__go { height: 36px; padding: 0 14px; border-radius: var(--r-control); background: var(--ink); color: var(--on-ink); font-size: var(--t-ui); font-weight: 500; flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.copy { min-width: 88px; padding: 0 10px; justify-content: center; }   /* snug: 10px sides, wide enough for "✓ Copied" (68px) so the swap never resizes it */
+.copy svg { width: 15px; height: 15px; }
+
+/* ── canvas: the kit playground's dotted stage ── */
+.canvas { position: relative; height: clamp(600px, 66vh, 760px); overflow: hidden;
+  background-color: var(--canvas); background-image: radial-gradient(var(--dot) 1px, transparent 1px); background-size: 16px 16px; background-position: 8px 8px; }
+/* Cards float over the stage: card surface, hairline edge, the kit's soft card shadow. */
+.card { position: absolute; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tile); box-shadow: var(--sh-card); }
+
+/* left column: Layers and Flow are one accordion — opening one collapses the other to its header */
+.side { position: absolute; left: var(--gut); top: var(--gut); bottom: calc(var(--gut) + 46px + 16px); width: var(--card-w); z-index: 4; display: flex; flex-direction: column; gap: 16px; }
+.side > .card { position: relative; }
+.flow { flex: 0 1 auto; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }   /* hugs its scenes; shrinks and scrolls when they don't fit */
+.card__head { flex: none; height: 52px; display: flex; align-items: center; gap: 8px; padding: 0 22px; border-bottom: 1px solid var(--line); background: var(--card); }
+.card__title { margin: 0; min-width: 0; font-size: var(--t-body); font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.card__title small { margin-left: 6px; font-size: inherit; font-weight: 400; color: var(--muted); }
+.card__title small::before { content: '· '; }
+.card__head .tag { margin: 0; flex: none; }
+.flow ol { list-style: none; margin: 0; padding: 10px; overflow: auto; display: flex; flex-direction: column; gap: 4px; }
+/* still scrolls (wheel, trackpad, touch, keyboard), just without a visible bar */
+.flow ol { scrollbar-width: none; }
+.flow ol::-webkit-scrollbar { display: none; }
+/* parent: a scene */
+.flow ol > li > button { width: 100%; text-align: left; display: grid; grid-template-columns: 24px 1fr auto; gap: 2px 12px; align-items: center; padding: 10px 12px; border-radius: var(--r-chip); }
+.flow ol > li > button[aria-pressed="true"] { background: var(--wash-4); }
+/* scene number: the kit's count pill — micro mono on a wash; ink for the open scene */
+.flow .n { align-self: center; width: 24px; height: 20px; display: grid; place-items: center; border-radius: var(--r-xs); background: var(--wash-4); font-family: var(--mono); font-size: var(--t-micro); font-weight: 500; color: var(--muted); }
+.flow button[aria-current="true"] .n { background: var(--ink); color: var(--on-ink); }
+.flow .nm { font-size: var(--t-ui); font-weight: 500; color: var(--ink); }
+.flow .len { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); }
+/* children: the layers that scene animates, on a guide line from the scene number */
+.tree { position: relative; list-style: none; margin: 4px 0 8px; padding: 0 0 0 24px; display: flex; flex-direction: column; gap: 2px; }
+.tree.is-new { animation: panelIn var(--d-swap) var(--ease-out); }
+.tree::before { content: ''; position: absolute; left: 23.5px; top: 0; bottom: 16px; width: 1px; background: var(--line-strong); }
+.tree button { position: relative; width: 100%; height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px 0 14px; border-radius: var(--r-chip); text-align: left; font-size: var(--t-label); color: var(--muted); }
+.tree button::before { content: ''; position: absolute; left: -0.5px; top: 50%; width: 8px; height: 1px; background: var(--line-strong); }
+.tree button[aria-pressed="true"] { background: var(--wash-4); color: var(--ink); font-weight: 500; }
+.tree button[data-cur] { color: var(--ink); font-weight: 500; }
+.tree button[data-cur] .tree__ico { color: var(--accent); }
+.tree__ico { width: 14px; height: 14px; flex: none; }
+.tree__nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tree__n { font-family: var(--mono); font-size: var(--t-micro); font-weight: 400; color: var(--muted); }
+@keyframes panelIn { from { opacity: 0; transform: translateY(4px); } }
+/* badge: neutral by default; amber (the kit's draft tone) when the timing varies */
+.tag { display: inline-flex; align-items: center; height: 18px; padding: 0 7px; border-radius: var(--r-full); background: var(--wash-4); color: var(--muted); font-family: var(--sans); font-size: var(--t-micro); font-weight: 500; line-height: 1; vertical-align: 1px; margin-left: 6px; letter-spacing: 0; text-transform: none; }
+.tag--warm { background: var(--draft-bg); color: var(--draft); }
+
+
+/* ── inspector: the kit playground's Props panel ── */
+.insp { right: var(--gut); top: var(--gut); width: var(--card-w); max-height: calc(100% - var(--gut) * 2); padding: 0 22px 20px; overflow: auto; scrollbar-width: none; }   /* hugs its content, capped at the canvas */
+/* the header stays put while the panel scrolls */
+.insp > .card__head { position: sticky; top: 0; z-index: 1; margin: 0 -22px; }
+.insp::-webkit-scrollbar { display: none; }
+/* sections: Values · Timing · Easing, each under a caps head and a hairline */
+.isec { margin: 20px -22px 0; padding: 20px 22px 0; border-top: 1px solid var(--line); }   /* hairline edge to edge, like the Flow head's */
+.card__head + .isec { margin-top: 0; border-top: 0; }   /* the header's own hairline is the first divider */
+.isec__h { margin: 0 0 14px; display: flex; align-items: center; gap: 8px; font-size: var(--t-micro); font-weight: 600; letter-spacing: .08em; line-height: 1.5; text-transform: uppercase; color: var(--muted); }
+.isec__name { margin: 0 0 12px; display: flex; align-items: center; gap: 8px; font-size: var(--t-label); font-weight: 500; color: var(--ink); }
+.isec__name .tag { margin: 0; }
+/* label · value pairs, as in ProtoPie: the label muted, the value beside it in the accent */
+.insp .kv { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; margin: 0; }
+.insp .kv > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.insp .kv > .wide { grid-column: 1 / -1; }
+.insp .kv dt { flex: none; font-size: var(--t-label); color: var(--muted); }
+.insp .kv dd { margin: 0; min-width: 0; font-family: var(--mono); font-size: var(--t-label); font-weight: 500; color: var(--accent); word-break: break-word; font-variant-numeric: tabular-nums; }
+.insp__plot { display: block; width: 100%; height: 104px; margin: 0 0 16px; padding: 6px 4px; border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--wash-1); color: var(--accent); }   /* the curve in the accent */
+.isec .insp__plot { margin: 0 0 14px; }
+/* code block: the kit's — Geist Mono 12.5 on the faintest wash, hairline, 14×16 padding */
+.insp__code { display: block; margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--r-xl); background: var(--wash-2); font-family: var(--mono); font-size: 12.5px; line-height: 1.625; color: color-mix(in oklab, var(--ink) 90%, transparent); word-break: break-all; }
+.insp__go { margin-top: 20px; }
+/* easing expression, as ProtoPie writes it: FUNCTION(Arg value) */
+.x { font-family: var(--mono); font-size: var(--t-label); font-weight: 500; color: var(--fn); }
+.x .x-n { color: var(--accent); }
+.isec__h .tag { margin: 0; text-transform: none; letter-spacing: 0; }
+/* "Current" follows the playhead — in red, as ProtoPie marks it */
+.insp .kv dd .live { color: var(--live); }
+/* the layer's "at 0.8s on the playhead" caption */
+.insp__cap { margin: 12px 0 0; font-size: var(--t-caption); color: var(--muted); }
+.anims { list-style: none; margin: -4px 0 -10px;   /* the rows' own 10px padding stands in for the panel's bottom space */ padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.anims button { width: calc(100% + 24px); margin: 0 -12px; display: grid; grid-template-columns: 16px 1fr auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: var(--r-chip); text-align: left; }
+.anims svg { width: 15px; height: 15px; }
+.anims .tree__ico { width: 14px; height: 14px; color: var(--muted); }
+.anims .n { width: 24px; height: 20px; display: grid; place-items: center; border-radius: var(--r-xs); background: var(--wash-4); font-family: var(--mono); font-size: var(--t-micro); font-weight: 500; color: var(--muted); }
+.anims button:has(.n) { grid-template-columns: 24px 1fr auto; }
+.anims__main { display: flex; flex-direction: column; min-width: 0; }
+.anims__main b { font-size: var(--t-label); font-weight: 500; }
+.anims__main span { font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.anims__t { font-family: var(--mono); font-size: var(--t-micro); line-height: 1.5; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* the phone's frame top-aligns with the floating cards (the frame is drawn ~4px outside the screen);
+   the room it gives up at the top goes to the bottom, so the phone keeps its size */
+.stage { position: absolute; left: 50%; top: calc(var(--gut) + 4px); bottom: calc(var(--stage-pad) * 2 - var(--gut) - 4px); transform: translateX(-50%); display: grid; place-items: start center; }
+/* the device is rendered content, not chrome: it keeps its own square edge and white screen */
+/* The device frame, as in the A/B library: a solid ink outline, its thickness a fraction of the
+   screen's height (÷152, ≈5.3pt on 812) so it stays in proportion when the phone is scaled to fit. */
+.phone { position: relative; width: var(--pw, 375px); height: var(--ph, 812px); transform-origin: 0 0; background: #fff; overflow: hidden;
+  outline: calc(var(--ph, 812px) / 152) solid var(--ink); box-shadow: var(--sh-device); }
+.phone iframe { position: absolute; left: 0; top: 0; width: var(--pw, 375px); height: var(--ph, 812px); border: 0; opacity: 0; pointer-events: none; }
+.phone iframe.is-front { opacity: 1; pointer-events: auto; }
+.phone__veil { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in oklab, var(--bg) 92%, transparent); font-size: var(--t-ui); font-weight: 500; color: var(--muted); text-align: center; padding: 40px; transition: opacity 200ms var(--ease-out) 150ms; }
+.phone__veil[hidden] { display: grid; opacity: 0; pointer-events: none; transition-delay: 0ms; }
+
+/* playback: a floating toolbar, control-radius, ghost buttons with one ink play button */
+.ctrl { position: absolute; left: var(--gut); bottom: var(--gut); height: 46px; display: flex; align-items: center; gap: 4px; padding: 6px; background: var(--card); border: 1px solid var(--line); border-radius: var(--r-2xl); box-shadow: var(--sh-card); z-index: 3; }
+.ctrl button { height: 32px; min-width: 32px; padding: 0 10px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: var(--r-chip); color: var(--ink); }
+.ctrl #play { width: 32px; padding: 0; background: var(--ink); color: var(--on-ink); }
+.ctrl #play svg { width: 12px; height: 13px; margin-left: 1px; }
+.ctrl #speed svg { width: 17px; height: 14px; }
+.ctrl i { width: 1px; height: 16px; margin: 0 2px; background: var(--line-strong); }
+.ctrl__speed { font-family: var(--mono); font-size: var(--t-caption); font-weight: 500; }
+.ctrl__state { padding: 0 10px 0 4px; font-family: var(--mono); font-size: var(--t-caption); color: var(--muted); white-space: nowrap; }
+.ctrl__cur { display: inline-block; text-align: right; color: var(--ink); }
+
+/* ── timeline ── */
+.tlwrap { overflow-x: auto; border-top: 1px solid var(--line); background: var(--bg); }
+.tl { position: relative; min-width: 940px; padding: 0 var(--tl-pr) var(--tl-pb) 0; }
+.tl__ruler { position: sticky; top: 0; z-index: 2; display: grid; grid-template-columns: var(--lab) 1fr; align-items: center; height: calc(40px + var(--tl-pt)); padding-top: var(--tl-pt); background: var(--bg); }   /* pinned while the rows scroll; carries the top padding so it keeps its air when pinned */   /* pinned while the rows scroll */
+.tl__start { height: 32px; margin-left: 20px; display: flex; align-items: center; gap: 8px; padding: 0 12px 0 10px; background: var(--wash-3); border-radius: var(--r-chip); font-size: var(--t-label); font-weight: 600; white-space: nowrap; overflow: hidden; min-width: 0; }
+.tl__start svg { width: 13px; height: 12px; }
+.tl__start small { font-size: var(--t-label); color: var(--ink); font-weight: 400; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.tl__scale { position: relative; height: 40px; margin-left: 10px; cursor: ew-resize; touch-action: none; }
+.tl__scale::after { content: ''; position: absolute; left: 0; right: 0; top: 26px; height: 1px; background: var(--line-strong); }
+.tick { position: absolute; top: 5px; font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); transform: translateX(-50%); white-space: nowrap; }
+.tick::after { content: ''; position: absolute; left: 50%; top: 18.5px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; corner-shape: round; background: var(--ink); }
+.tick--minor { color: transparent; }
+.tick--minor::after { width: 1px; height: 4px; margin-left: 0; border-radius: 0; background: var(--line-control); top: 19.5px; }
+.tick--zero { transform: none; }
+.tick--zero::after { left: 0; margin-left: 0; }
+.tl__rows { position: relative; }
+.grp { display: grid; grid-template-columns: var(--lab) 1fr; height: 34px; align-items: end; padding-bottom: 4px; }
+.grp b { padding-left: 30px; }
+.grp span { position: relative; margin-left: 10px; padding-bottom: 1px; font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.grp span::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.row { display: grid; grid-template-columns: var(--lab) 1fr; height: calc(var(--rowh) + var(--rowgap)); align-items: center; cursor: pointer; }
+.row__lab { display: flex; align-items: center; gap: 10px; height: calc(var(--rowh) + 4px); margin-left: 20px; padding-left: 10px; border-radius: var(--r-lg); font-size: var(--t-label); white-space: nowrap; overflow: hidden; transition: background-color var(--d-press) var(--ease-out); }
+.row__lab svg { width: 15px; height: 15px; color: var(--ink); }
+.row__lab b { font-weight: 500; }
+.row__lab span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }
+.row__lab em { font-style: normal; font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); }
+.row__trk { position: relative; height: var(--rowh); margin-left: 10px; background: var(--row); border-radius: var(--r-lg); overflow: hidden; cursor: ew-resize; touch-action: none; transition: background-color var(--d-press) var(--ease-out); }
+.row[aria-selected="true"] .row__lab { background: var(--wash-4); }
+.row[aria-selected="true"] .row__lab b { font-weight: 600; }
+.row[aria-selected="true"] .row__trk { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.row.is-dim { opacity: .3; }
+.bar { position: absolute; top: 0; height: 100%; display: grid; place-items: center; overflow: hidden; font-family: var(--mono); font-size: var(--t-micro); font-weight: 500; white-space: nowrap; }
+.bar--delay { background: var(--delay); color: var(--muted); }
+.bar--dur { background: var(--dur); color: var(--dur-ink); border-radius: var(--r-xs); }
+.bar--approx { background: repeating-linear-gradient(135deg, var(--dur) 0 6px, color-mix(in oklab, var(--dur) 72%, var(--bg)) 6px 12px); }
+.bar--repeat { background: linear-gradient(90deg, var(--dur) 70%, color-mix(in oklab, var(--dur) 20%, transparent)); }
+.bar--mark { width: 2px; margin-left: -1px; background: var(--dur); border-radius: 1px; }
+.bar--scene { background: var(--ink); }
+.bar span { padding: 0 6px; }
+.after { position: absolute; top: 0; height: 100%; display: flex; align-items: center; padding-left: 8px; font-family: var(--mono); font-size: var(--t-micro); color: var(--muted); white-space: nowrap; pointer-events: none; }
+/* playhead: the one orange on the page, used for "now" */
+.head { position: absolute; top: 2px; bottom: 0; width: 0; pointer-events: none; z-index: 2; }
+.head::before { content: ''; position: absolute; left: -0.75px; top: 10px; bottom: 0; width: 1.5px; background: var(--head); }
+.head__pin { position: sticky; top: calc(var(--tl-pt) + 2px); height: 0; }   /* the pin + grip stay on the pinned ruler; the line runs on below */
+.head__pin::before { content: ''; position: absolute; left: -3px; width: 6px; bottom: 0; height: calc(var(--tl-pt) + 8px); background: var(--bg); }   /* hides the line above the pin */
+.head__pin::after { content: ''; position: absolute; left: -7px; top: 0; width: 14px; height: 14px; background: var(--head); border-radius: 50% 50% 50% 0; corner-shape: round; transform: rotate(-45deg); box-shadow: var(--sh-pill); }
+.grip { position: absolute; left: -14px; top: -8px; width: 28px; height: 30px; pointer-events: auto; cursor: grab; border-radius: 50%; corner-shape: round; touch-action: none; }
+.head__line { position: absolute; left: -7px; width: 14px; top: 20px; bottom: 0; pointer-events: auto; cursor: ew-resize; }
+body.is-scrubbing, body.is-scrubbing * { cursor: grabbing !important; user-select: none; }
+.lane { position: absolute; z-index: 3; top: var(--tl-pt); bottom: var(--tl-pb); left: calc(var(--lab) + 10px); right: var(--tl-pr); pointer-events: none; }
+.foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin: 0; padding: 8px var(--tl-pr) 32px calc(var(--lab) + 10px); font-size: var(--t-caption); color: var(--muted); line-height: 1.6; }
+.foot code { font-family: var(--mono); font-size: var(--t-caption); }
+.legend { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { display: inline-block; width: 18px; height: 8px; border-radius: 2px; }
+
+/* Toast, as the kit's: ink pill, 14px medium — top centre, inside the header band (its middle is empty).
+   Arrives from the edge it lives on (12px drop + fade, 200ms), leaves shorter and softer (6px up, 120ms). */
+.toast { position: fixed; left: 0; right: 0; top: calc(7px + env(safe-area-inset-top)); z-index: 80; width: fit-content; max-width: calc(100% - 32px); margin: 0 auto;
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 14px; border-radius: var(--r-control); background: var(--ink); color: var(--on-ink);
+  font-size: var(--t-ui); font-weight: 500; line-height: 1.5; box-shadow: var(--sh-toast); cursor: default;
+  transition: opacity 200ms var(--ease-out), transform 200ms var(--ease-out); }
+.toast svg { width: 16px; height: 16px; flex: none; color: var(--on-ink); }
+.toast.is-enter { opacity: 0; transform: translateY(-12px); }
+.toast[data-closing] { opacity: 0; transform: translateY(-6px); transition-duration: 120ms; pointer-events: none; }
+
+/* Hover lives in one place, behind a real pointer, so it never latches on touch. */
+@media (hover: hover) and (pointer: fine) {
+  .top__back:hover, .ctrl button:not(#play):hover { background: var(--wash-3); }
+  .top__std:hover { background: var(--wash-5); }
+  .copy:hover, .insp__go:hover, .ctrl #play:hover { background: var(--ink-hover); }
+  .flow li button[aria-pressed="false"]:hover, .anims button:hover { background: var(--wash-3); color: var(--ink); }
+  .row:hover .row__lab { background: var(--wash-3); }
+  .row:hover .row__trk { background: var(--row-hover); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; transition-duration: 80ms !important; }
+}
+
+@media (max-width: 1240px) { :root { --card-w: 300px; } }
+/* App shell, desktop: the page is exactly one screen tall and never scrolls. The top bar and the
+   canvas hold still; only the timeline below scrolls, inside its own box (as ProtoPie's does).
+   The canvas gives the timeline at least 240px whenever the window allows. */
+@media (min-width: 961px) {
+  html, body { height: 100%; overflow: hidden; }
+  body { display: flex; flex-direction: column; }
+  .top { flex: none; }
+  .canvas { flex: none; height: clamp(440px, calc(100vh - 56px - 240px), 760px); }
+  .tlwrap { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: none; }
+  .tlwrap::-webkit-scrollbar { display: none; }
+}
+@media (max-width: 960px) {
+  :root { --lab: 220px; --gut: 16px; --stage-pad: 16px; }
+  .canvas { height: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .card, .stage, .ctrl, .side { position: static; transform: none; width: auto; }
+  .side { flex: none; }
+  .flow { max-height: 340px; }
+  .stage { order: 2; height: 520px; }
+  .ctrl { order: 3; align-self: flex-start; }
+  .insp { order: 4; }
+  .row__lab { gap: 8px; }
+  .foot { padding-left: 16px; }
+}
+@media (max-width: 560px) { .copy { display: none; } .top { gap: 8px; } }
+
+/* ── this project: the prototype is a 1440×900 desktop page, so the stage also keeps clear of the two cards ── */
+@media (min-width: 961px) {
+  .stage { bottom: max(calc(var(--stage-pad) * 2 - var(--gut) - 4px), calc(100% - var(--gut) - 4px - (100vw - 2 * (var(--gut) + var(--card-w)) - 48px) * 0.625)); }
+}
+@media (max-width: 960px) { .stage { height: min(520px, calc((100vw - 32px) * 0.625)); } }
+/* iteration switcher (page chrome, outside the engine): a kit segmented control */
+.iters { display: inline-flex; gap: 2px; padding: 2px; border-radius: var(--r-control); background: var(--wash-3); flex: none; }
+.iters a { height: 32px; padding: 0 12px; display: inline-flex; align-items: center; border-radius: calc(var(--r-control) - 2px); font-size: var(--t-label); font-weight: 500; color: var(--muted); text-decoration: none; white-space: nowrap;
+  transition: background-color var(--d-press) var(--ease-out), color var(--d-press) var(--ease-out); }
+.iters a[aria-current='page'] { background: var(--card); color: var(--ink); box-shadow: var(--sh-pill); }
+@media (hover: hover) and (pointer: fine) { .iters a:not([aria-current='page']):hover { color: var(--ink); background: var(--wash-3); } }
+@media (max-width: 760px) { .iters a { padding: 0 8px; } .iters a span { display: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <a class="top__back" id="back" href="/" aria-label="Back to the prototype"><svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M20 12H4m0 0 6.5-6.5M4 12l6.5 6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+  <div class="top__title" id="title">Image View — Animation Spec</div>
+  <nav class="iters" id="iters" aria-label="Iteration"></nav>
+  <div class="top__sp"></div>
+  <a class="top__std" href="/motion/">Motion standard</a>
+  <button class="copy" id="copy">Copy link</button>
+</header>
+
+<section class="canvas" id="canvas">
+  <div class="side" id="side">
+  <nav class="card flow" aria-label="Flow scenes"><div class="card__head"><h3 class="card__title">Flow</h3><span class="count" id="flowCount"></span></div><ol id="flow"></ol></nav>
+  </div>
+  <div class="stage" id="stage">
+    <div class="phone" id="phone">
+      <div class="phone__veil" id="veil" role="status">Loading…</div>
+    </div>
+  </div>
+  <aside class="card insp" id="insp" aria-live="polite"></aside>
+  <div class="ctrl">
+    <button id="play" aria-label="Play"><svg id="playIco" width="16" height="18" viewBox="0 0 16 18"><path d="M1 1.5v15L15 9z" fill="currentColor"/></svg></button>
+    <i></i>
+    <button id="speed" class="ctrl__speed" aria-label="Playback speed"><svg width="22" height="18" viewBox="0 0 22 18" fill="none"><path d="M3 15a8 8 0 1 1 16 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m11 15 3.5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="speedLbl">× 1</span></button>
+    <span class="ctrl__state" id="state"><span class="ctrl__cur" id="stateCur"></span> / <span id="stateEnd"></span></span>
+  </div>
+</section>
+
+<div class="tlwrap">
+  <div class="tl" id="tl">
+    <div class="tl__ruler">
+      <div class="tl__start"><svg width="18" height="16" viewBox="0 0 18 16"><path d="M2 1v14" stroke="currentColor" stroke-width="2"/><path d="M3 1.5h12l-3 4 3 4H3z" fill="currentColor"/></svg>Start <small id="trigger"></small></div>
+      <div class="tl__scale" id="scale"></div>
+    </div>
+    <div class="tl__rows" id="rows"></div>
+    <div class="lane" id="lane"><div class="head" id="head"><div class="head__pin"><button class="grip" id="grip" aria-label="Playhead — drag to scrub, arrow keys step a frame"></button></div><i class="head__line" id="headLine" aria-hidden="true"></i></div></div>
+  </div>
+  <p class="foot">
+    <span class="legend"><i style="background:var(--delay)"></i>delay</span>
+    <span class="legend"><i style="background:var(--dur)"></i>duration</span>
+    <span class="legend"><i class="bar--approx" style="position:static"></i><span id="legendApprox">timing varies at runtime (≈)</span></span>
+    <span class="legend"><i class="bar--repeat" style="position:static"></i>repeats</span>
+    <span class="legend"><i style="width:2px;height:12px;background:var(--dur);border-radius:1px"></i>haptic pulse</span>
+  </p>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite" aria-atomic="true"></div>
+
+<script>
+/* ═══ SpecKit — generic helpers shared by every spec sheet (do not edit per project) ═══
+   Row helpers: S(spring key, {x0, v0}) · C(curve key) · H(haptic kind, layer, selector, ms | [ms…], note)
+   Maths: springFn(ω, ζ, x0, v0) → { d(t), v(t) } (t in s) · firstT(f, test) → first ms where test(d, v)
+   Layout: rowEnd(row) / sceneEnd(rows) in ms.                                                     */
+window.SpecKit = (() => {
+  const springFn = (w, z, x0, v0 = 0) => { const wd = w * Math.sqrt(1 - z * z), a = z * w;
+    return { d: (t) => Math.exp(-a * t) * (x0 * Math.cos(wd * t) + ((v0 + a * x0) / wd) * Math.sin(wd * t)),
+             v: (t) => Math.exp(-a * t) * (v0 * Math.cos(wd * t) - ((a * v0 + w * w * x0) / wd) * Math.sin(wd * t)) }; };
+  const firstT = (f, test, max = 4) => { for (let t = 0; t < max; t += 0.001) if (test(f.d(t), f.v(t))) return t * 1000; return max * 1000; };
+  const S = (k, extra = {}) => ({ kind: 'spring', k, ...extra });
+  const C = (k) => ({ kind: 'curve', k });
+  // haptics (the prototype's Haptics helper): iOS generator + style, Android vibrate, iOS-Safari fallback
+  const HAP = {
+    tap:     { name: 'tap',     gen: 'UIImpactFeedbackGenerator', style: 'light', vibe: '8ms', call: 'Haptics.tap()' },
+    tick:    { name: 'tick',    gen: 'UISelectionFeedbackGenerator', style: 'selection', vibe: '4ms', call: 'Haptics.tick()' },
+    snap:    { name: 'snap',    gen: 'UIImpactFeedbackGenerator', style: 'medium', intensity: 0.8, vibe: '12ms', call: 'Haptics.snap()' },
+    edge:    { name: 'edge',    gen: 'UIImpactFeedbackGenerator', style: 'rigid', intensity: 0.6, vibe: '10ms', call: 'Haptics.edge()' },
+    success: { name: 'success', gen: 'UINotificationFeedbackGenerator', style: 'success', vibe: '[10, 40, 16]', call: 'Haptics.success()' },
+  };
+  const H = (k, layer, sel, at, note, extra = {}) => ({ icon: 'haptic', prop: 'Haptic', layer, sel, delay: Array.isArray(at) ? (at[0] || 0) : at, dur: 10, from: '—', to: '—',
+    ease: { kind: 'haptic', ...HAP[k] }, marks: Array.isArray(at) ? at : [at], note, ...extra });
+  const rowEnd = (r) => r.delay + (r.stagger ? (r.stagger.n - 1) * r.stagger.step : 0) + (r.marks ? Math.max(...r.marks) - r.delay : 0) + r.dur;
+  const sceneEnd = (rows) => Math.max(...rows.filter((r) => !r.grp && !r.repeat).map(rowEnd));
+  // a PP-style sampled spring's length for a travel of |d| (settles to 0.02 of a unit)
+  const sampleLen = (spr, d) => 1000 * Math.max(0.2, Math.log(Math.max(Math.abs(d), 0.02) / 0.02) / (spr.z * spr.w) + 0.05);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));   // real time (for history / tasks to land)
+  return { springFn, firstT, S, C, H, HAP, rowEnd, sceneEnd, sampleLen, wait };
+})();
+</script>
+
+<script id="spec-config">
+/* ═══ PROJECT CONFIG — noon web PDP · customer-photos image view ════════════════
+   The engine below never changes between projects: it reads window.SPEC only.
+   Every value here is read off the prototype's code (src/viewer/*), so the timeline is what the browser runs:
+   PhotoViewer.tsx (flights, mask swap), SlideStrip.tsx (slide spring), PhotoGrid.tsx (gallery reveal),
+   GalleryButton.tsx (label fold), ReviewPanel.tsx + viewer.css (crossfades, hovers).
+   Measured on a 1440×900 window: stage 1080×820 beside a 360px review panel; a portrait photo fits at 540×720.
+   Iteration 01 = "Next photo: Mask", Iteration 02 = "Next photo: Slide" (the Variants widget's photoSwap). */
+window.SPEC = (() => {
+  const { springFn, firstT, S, C, sceneEnd } = SpecKit;
+  const PATHS = { 1: '/?photoSwap=mask&', 2: '/?photoSwap=slide&' };   // the engine appends ?spec=… — the & keeps both params
+  const ITER = { 1: 'Iteration 01 · Mask', 2: 'Iteration 02 · Slide' };
+
+  // CSS cubic-bezier() → an evenly sampled linear(), so the inspector can plot it
+  const bez = (x1, y1, x2, y2, n = 32) => {
+    const B = (t, a, b) => 3 * a * t * (1 - t) ** 2 + 3 * b * t * t * (1 - t) + t ** 3;
+    const y = (u) => { if (u <= 0) return 0; if (u >= 1) return 1; let lo = 0, hi = 1, t = u;
+      for (let i = 0; i < 40; i++) { t = (lo + hi) / 2; if (B(t, x1, x2) < u) lo = t; else hi = t; } return B(t, y1, y2); };
+    const f = (u) => y(u);
+    f.fn = `linear(${Array.from({ length: n + 1 }, (_, k) => +y(k / n).toFixed(4)).join(', ')})`;
+    return f;
+  };
+  const FLY = bez(0.32, 0.72, 0, 1), SHAPE = bez(0.4, 0, 0.2, 1), SINE = bez(0.37, 0, 0.63, 1), QUINT = bez(0.22, 1, 0.36, 1),
+    ACCEL = bez(0.4, 0, 1, 1), DECEL = bez(0, 0, 0.2, 1), FOLD = bez(0.65, 0, 0.35, 1), WIG = bez(0.37, 0, 0.3, 1), POP = bez(0.34, 1.56, 0.64, 1),
+    EOUT = bez(0, 0, 0.58, 1), EASE = bez(0.25, 0.1, 0.25, 1);
+
+  const SPR = {
+    // SlideStrip: a ← −ω²(x − target) − 2ω·v, ω 15, critically damped (ζ 1; drawn at 0.9999 so the closed form holds)
+    slide: { name: 'Slide spring', w: 15, z: 0.9999, src: 'SlideStrip.tsx · OMEGA 15' },
+  };
+  const CURVE = {
+    fly:   { name: 'Flight · cubic-bezier(0.32, 0.72, 0, 1)', fn: FLY.fn },
+    shape: { name: 'Shape · cubic-bezier(0.4, 0, 0.2, 1)', fn: SHAPE.fn },
+    sine:  { name: 'Sine · cubic-bezier(0.37, 0, 0.63, 1)', fn: SINE.fn },
+    quint: { name: 'Ease-out quint · cubic-bezier(0.22, 1, 0.36, 1)', fn: QUINT.fn },
+    accel: { name: 'Accelerate · cubic-bezier(0.4, 0, 1, 1)', fn: ACCEL.fn },
+    decel: { name: 'Decelerate · cubic-bezier(0, 0, 0.2, 1)', fn: DECEL.fn },
+    fold:  { name: 'Fold · cubic-bezier(0.65, 0, 0.35, 1)', fn: FOLD.fn },
+    out:   { name: 'ease-out (CSS)', fn: EOUT.fn },
+    ease:  { name: 'ease (CSS)', fn: EASE.fn },
+    lin:   { name: 'Linear', fn: 'linear(0, 1)' },
+  };
+
+  /* ═══ derived timing ═══ */
+  const FLY_MS = 460, FADE = 300, LAYER = 260;
+  // the slide spring is done when |x − target| < 0.0005 and |v| < 0.002 (photo units)
+  const slideLen = Math.round(firstT(springFn(15, 0.9999, -1, 0), (d, v) => Math.abs(d) < 0.0005 && Math.abs(v) < 0.002));
+  const swapMs = (aspFrom, aspTo) => Math.round(520 + Math.min(180, Math.abs(Math.log(aspTo / aspFrom)) * 220));
+
+  // mask morph: hold the old shape for 12% of the swap, then ease into the new one (one curve, no speed jump)
+  const holdEase = { kind: 'custom', label: 'Hold 12%, then ease', tag: 'Shape morph',
+    info: [['Hold', '12% of the swap'], ['Then', 'cubic-bezier(0.4, 0, 0.2, 1)', true]],
+    code: "mask.animate([{w0,h0}, {w0,h0, offset: 0.12, easing: 'cubic-bezier(0.4,0,0.2,1)'}, {w1,h1}], { duration })",
+    plot: { span: 1, f: (t) => (t < 0.12 ? 0 : SHAPE((t - 0.12) / 0.88)) } };
+  // breath: 1 → 0.965 at 32% → 1, sine both ways (value shown as progress toward the dip)
+  const breathEase = { kind: 'custom', label: 'Dip and back', tag: 'Breath',
+    info: [['Dip', '96.5% at 32%'], ['Easing', 'sine, both legs']],
+    code: "mask.animate([{scale: 1, easing: SINE}, {scale: 0.965, offset: 0.32, easing: SINE}, {scale: 1}], { duration })",
+    plot: { span: 1, f: (t) => (t < 0.32 ? SINE(t / 0.32) : 1 - SINE((t - 0.32) / 0.68)) } };
+
+  /* ═══ row builders ═══ */
+  const flight = (at, w0, h0, r0, w1, h1, r1, note) => [
+    { icon: 'size', prop: 'Width', layer: 'Flying Photo', sel: '.pv__flyer', delay: at, dur: FLY_MS, from: `${w0}px`, to: `${w1}px`, ease: C('fly'), note },
+    { icon: 'size', prop: 'Height', layer: 'Flying Photo', sel: '.pv__flyer', delay: at, dur: FLY_MS, from: `${h0}px`, to: `${h1}px`, ease: C('fly') },
+    { icon: 'scale', prop: 'Radius', layer: 'Flying Photo', sel: '.pv__flyer', delay: at, dur: FLY_MS, from: `${r0}px`, to: `${r1}px`, ease: C('fly') },
+  ];
+  // one step to the next photo; the review panel/thumbnail rows are added by the scene
+  function stepRows(v, { w0 = 540, h0 = 720, w1 = 540, h1 = 720, gap = 810, sameReview = true } = {}) {
+    const rows = [];
+    if (v === 2) {
+      rows.push({ grp: 'Slide', at: 0, note: 'Photos are cards on a strip; the neighbour rests just outside the stage, so nothing peeks at rest.' });
+      rows.push({ icon: 'move', prop: 'Move X', layer: 'Photo Strip', sel: '.pv__strip', delay: 0, dur: slideLen, from: '0px', to: `−${gap}px`, ease: S('slide'), driver: 'frame',
+        note: `Centre-to-centre ${gap}px = half the 1080px stage + half the wider photo. Critically damped (ω 15, no overshoot): a press mid-slide just retargets the spring and keeps its velocity.` });
+      rows.push({ icon: 'scale', prop: 'Scale', layer: 'Outgoing Card', sel: '.pv__slideCard', delay: 0, dur: slideLen, from: '100%', to: '92%', ease: S('slide'),
+        note: 'Bound to the strip: a card one step from the centre sits 8% smaller (DEPTH 0.08). Radius scales with it (32px × scale).' });
+      rows.push({ icon: 'scale', prop: 'Scale', layer: 'Incoming Card', sel: '.pv__slideCard', delay: 0, dur: slideLen, from: '92%', to: '100%', ease: S('slide') });
+      rows.push({ icon: 'scale', prop: 'Photo Zoom', layer: 'Incoming Photo', sel: '.pv__slideCard img', delay: 0, dur: slideLen, from: '114%', to: '100%', ease: S('slide'),
+        note: 'Parallax: inside an off-centre card the photo is zoomed 14% and shifted back toward the centre by that margin, so the card edge sweeps over it. At rest the zoom is 0 — never cropped.' });
+    } else {
+      const D = swapMs(w0 / h0, w1 / h1), big = D > 520;
+      rows.push({ grp: 'Mask swap', at: 0, note: `One rounded mask holds both photos: it dips, then opens into the next photo’s exact size while they crossfade inside it. ${D}ms${big ? ` — a big shape change adds up to 180ms (520 + min(180, |ln(aspect ratio)| × 220))` : ''}. Starts once the next photo is decoded (already loaded here).` });
+      rows.push({ icon: 'size', prop: 'Width', layer: 'Photo Mask', sel: '.pv__mask', delay: 0, dur: D, from: `${w0}px`, to: `${w1}px`, ease: holdEase,
+        note: w0 === w1 && h0 === h1 ? 'Same shape here, so the size holds; with a different shape it morphs on this curve.' : 'Width and height morph together on one curve, so the motion never changes speed half-way.' });
+      rows.push({ icon: 'size', prop: 'Height', layer: 'Photo Mask', sel: '.pv__mask', delay: 0, dur: D, from: `${h0}px`, to: `${h1}px`, ease: holdEase });
+      rows.push({ icon: 'scale', prop: 'Scale', layer: 'Photo Mask', sel: '.pv__mask', delay: 0, dur: D, from: '100%', to: '96.5%', ease: breathEase,
+        note: 'A separate breath: dips to 96.5% at 32% and opens back to 100% — the “contract, then open” feel. Interrupted mid-way it starts from the live scale.' });
+      rows.push({ icon: 'scale', prop: 'Scale', layer: 'Outgoing Photo', sel: '.pv__img--out', delay: 0, dur: 260, from: '100%', to: '98%', ease: C('sine') });
+      rows.push({ icon: 'opacity', prop: 'Opacity', layer: 'Outgoing Photo', sel: '.pv__img--out', delay: Math.round(D * 0.18), dur: Math.round(D * 0.4), from: '1', to: '0', ease: C('accel'), note: 'Hands over early: 18% → 58% of the swap.' });
+      rows.push({ icon: 'opacity', prop: 'Opacity', layer: 'Incoming Photo', sel: '.pv__img--in', delay: Math.round(D * 0.14), dur: Math.round(D * 0.45), from: '0', to: '1', ease: C('decel'),
+        note: 'Both photos fill the mask (object-fit: cover) during the morph, so no empty band shows even portrait ↔ landscape.' });
+      rows.push({ icon: 'scale', prop: 'Scale', layer: 'Incoming Photo', sel: '.pv__img--in', delay: Math.round(D * 0.14), dur: Math.round(D * 0.86), from: '102%', to: '100%', ease: C('quint'), note: 'Settles with the shape.' });
+    }
+    if (sameReview) {
+      rows.push({ grp: 'Review photos (bottom carousel)', at: 0, note: 'Same review: the panel stays still; only the selected thumbnail moves.' });
+      rows.push({ icon: 'opacity', prop: 'Opacity', layer: 'Thumbnail (new)', sel: '.pv__thumb[aria-current]', delay: 0, dur: 200, from: '0.4', to: '1', ease: C('ease'), note: 'Square 52px thumbnails; the others rest at 40%.' });
+      rows.push({ icon: 'opacity', prop: 'Ring', layer: 'Thumbnail (new)', sel: '.pv__thumb[aria-current]', delay: 0, dur: 200, from: 'transparent', to: '2px white', ease: C('ease') });
+      rows.push({ icon: 'opacity', prop: 'Opacity', layer: 'Thumbnail (old)', sel: '.pv__thumb:not([aria-current])', delay: 0, dur: 200, from: '1', to: '0.4', ease: C('ease') });
+    }
+    return rows;
+  }
+  const reviewSwap = (at) => [
+    { grp: 'Review panel', at, note: 'Crossing into another review swaps the panel: the old one leaves quickly, the new one rises in after it.' },
+    { icon: 'opacity', prop: 'Opacity', layer: 'Review (out)', sel: '.pv__reviewStack > .pv__reviewLayer[data-state="out"]', delay: at, dur: 220, from: '1', to: '0', ease: C('accel') },
+    { icon: 'move', prop: 'Move Y', layer: 'Review (out)', sel: '.pv__reviewStack > .pv__reviewLayer[data-state="out"]', delay: at, dur: 220, from: '0px', to: '−3px', ease: C('accel') },
+    { icon: 'opacity', prop: 'Blur', layer: 'Review (out)', sel: '.pv__reviewStack > .pv__reviewLayer[data-state="out"]', delay: at, dur: 220, from: '0px', to: '2px', ease: C('accel') },
+    { icon: 'opacity', prop: 'Opacity', layer: 'Review (in)', sel: '.pv__reviewStack > .pv__reviewLayer[data-state="in"]', delay: at + 90, dur: 420, from: '0', to: '1', ease: C('quint'), note: '90ms after the old one starts leaving.' },
+    { icon: 'move', prop: 'Move Y', layer: 'Review (in)', sel: '.pv__reviewStack > .pv__reviewLayer[data-state="in"]', delay: at + 90, dur: 420, from: '6px', to: '0px', ease: C('quint') },
+    { icon: 'opacity', prop: 'Blur', layer: 'Review (in)', sel: '.pv__reviewStack > .pv__reviewLayer[data-state="in"]', delay: at + 90, dur: 420, from: '2px', to: '0px', ease: C('quint') },
+    { icon: 'opacity', prop: 'Opacity · Move Y · Blur', layer: 'Reviewer (avatar, name, date)', sel: '.pv__panelHead .pv__reviewLayer', delay: at, dur: 510, from: 'out ↓', to: 'in ↑', ease: C('quint'),
+      note: 'The header by the close button crossfades with the review: out 220ms, in 420ms after 90ms — the same two animations as the body.' },
+    { icon: 'opacity', prop: 'Opacity', layer: 'Thumbnail Row', sel: '.pv__thumbs', delay: at, dur: 240, from: '0', to: '1', ease: C('out'), note: 'A new review brings a new row of its photos (hidden when the review has one photo).' },
+  ];
+
+  /* ═══ scenes ═════════════════════════════════════════════════════════════ */
+  const REVEAL_N = 8, REVEAL_STEP = 22;
+  const SCENES = [
+    { id: 0, name: 'Overview', trig: 'the whole image view, played end to end', summary: 'PDP photo → next → next review → gallery → photo → close', overview: true },
+    { id: 1, name: 'Open photo', trig: 'Click a customer photo on the PDP', rows: () => [
+      { icon: 'opacity', prop: 'Opacity', layer: 'Image View', sel: '.pv', delay: 0, dur: FADE, from: '0', to: '1', ease: C('fly'), note: 'The black backdrop, bar and panel fade in over the page (scroll locked, scrollbar width compensated).' },
+      ...flight(0, 111, 138, 12, 540, 720, 32, 'The clicked tile’s photo flies out of the strip and lands in the stage (shared element): position, size and radius on one curve — fast start, long soft landing. Left/top go from the tile’s place on screen to (270, 80).'),
+      { icon: 'opacity', prop: 'Opacity', layer: 'Photo Layer', sel: '.pv__photoMode', delay: 0, dur: LAYER, from: '0', to: '1', ease: C('out'),
+        note: 'Bar, arrows and carousel. “Gallery” is spelled out on every open and folds 5s later (scene 09).' },
+      { icon: 'opacity', prop: 'Opacity', layer: 'Thumbnail Row', sel: '.pv__thumbs', delay: 0, dur: 240, from: '0', to: '1', ease: C('out') },
+      { icon: 'opacity', prop: 'Opacity · Move Y · Blur', layer: 'Review (in)', sel: '.pv__reviewStack > .pv__reviewLayer', delay: 90, dur: 420, from: '0 · 6px · 2px', to: '1 · 0 · 0', ease: C('quint') },
+    ] },
+    { id: 2, name: 'Next photo', trig: 'Next arrow / → key — same review', varies: true, rows: (v) => stepRows(v) },
+    { id: 3, name: 'Next review', trig: 'Next arrow / → key — into another review', varies: true, rows: (v) => [...stepRows(v, { sameReview: false }), ...reviewSwap(0)] },
+    { id: 4, name: 'Portrait → landscape', trig: 'Next arrow on a big shape change (photo 66 → 67)', varies: true,
+      rows: (v) => stepRows(v, { w1: 888, h1: 500, gap: 984 }) },
+    { id: 5, name: 'Open gallery', trig: 'Click the Gallery button', rows: () => [
+      ...flight(0, 540, 720, 32, 345, 460, 16, 'The photo flies back into its own tile in the masonry grid (the grid first scrolls that tile into view); the tile stays hidden until it lands.'),
+      { icon: 'opacity', prop: 'Opacity', layer: 'Photo Layer', sel: '.pv__photoMode', delay: 0, dur: LAYER, from: '1', to: '0', ease: C('out') },
+      { icon: 'opacity', prop: 'Opacity', layer: 'Grid Layer', sel: '.pv__gridMode', delay: 0, dur: LAYER, from: '0', to: '1', ease: C('out'), note: 'No stagger here — the populate reveal only plays when the gallery opens straight from the page (scene 07).' },
+    ] },
+    { id: 6, name: 'Pick from gallery', trig: 'Click a photo in the gallery', rows: () => [
+      ...flight(0, 345, 460, 16, 540, 720, 32, 'The tile’s photo flies to the stage. If the tile was hovered its photo is zoomed 105%; the flight starts from that zoom and eases it back to 100% on the same curve, so nothing pops.'),
+      { icon: 'scale', prop: 'Photo Zoom', layer: 'Flying Photo', sel: '.pv__flyer img', delay: 0, dur: FLY_MS, from: '105%', to: '100%', ease: C('fly'), note: 'Only when the tile was hovered.' },
+      { icon: 'opacity', prop: 'Opacity', layer: 'Grid Layer', sel: '.pv__gridMode', delay: 0, dur: LAYER, from: '1', to: '0', ease: C('out') },
+      { icon: 'opacity', prop: 'Opacity', layer: 'Photo Layer', sel: '.pv__photoMode', delay: 0, dur: LAYER, from: '0', to: '1', ease: C('out') },
+    ] },
+    { id: 7, name: 'View all', trig: 'Click “View all” on the PDP strip', rows: () => [
+      { icon: 'opacity', prop: 'Opacity', layer: 'Image View', sel: '.pv', delay: 0, dur: FADE, from: '0', to: '1', ease: C('fly') },
+      { icon: 'move', prop: 'Move Y', layer: 'Gallery Tiles', sel: '.pv__tile', delay: 60, dur: 520, from: '18px', to: '0px', ease: C('quint'), stagger: { n: REVEAL_N, step: REVEAL_STEP, order: 'reading order, rows lead' },
+        note: 'Populate: only the tiles on screen animate, top-left → bottom-right with a slight diagonal (y + 0.45·x); 22ms apart, the last capped at +330ms so a tall window never drags. Off-screen tiles are simply there.' },
+      { icon: 'scale', prop: 'Scale', layer: 'Gallery Tiles', sel: '.pv__tile', delay: 60, dur: 520, from: '97%', to: '100%', ease: C('quint'), stagger: { n: REVEAL_N, step: REVEAL_STEP, order: 'reading order, rows lead' } },
+      { icon: 'opacity', prop: 'Opacity', layer: 'Gallery Tiles', sel: '.pv__tile', delay: 60, dur: 520, from: '0', to: '1', ease: C('quint'), stagger: { n: REVEAL_N, step: REVEAL_STEP, order: 'reading order, rows lead' } },
+      { icon: 'opacity', prop: 'Opacity', layer: 'Tile Photo', sel: '.pv__tile img', delay: 0, dur: 320, from: '0', to: '1', ease: C('out'), note: 'Each photo fades in as it loads (instant when cached).' },
+    ] },
+    { id: 8, name: 'Close', trig: 'Close button / Esc', rows: () => [
+      ...flight(0, 540, 720, 32, 111, 138, 12, 'The photo flies back into the PDP tile it came from (or that photo’s strip tile, if it is on screen); otherwise the view just fades.'),
+      { icon: 'opacity', prop: 'Opacity', layer: 'Image View', sel: '.pv', delay: 0, dur: FADE, from: '1', to: '0', ease: C('fly'), note: 'Focus returns to the tile that opened it.' },
+    ] },
+    { id: 9, name: 'Gallery label folds', trig: 'Open the image view (label folds 5s later)', rows: () => [
+      { icon: 'opacity', prop: 'Opacity', layer: 'Image View', sel: '.pv', delay: 0, dur: FADE, from: '0', to: '1', ease: C('fly') },
+      { grp: 'Fold @ 5s', at: 5000, note: 'Timed from when the view opened, so coming back from the gallery never spells it out again. If the pointer is on the button at 5s, it folds 1.2s after it leaves.' },
+      { icon: 'size', prop: 'Width', layer: 'Gallery Label', sel: '.pv__galleryLabel', delay: 5000, dur: 480, from: '52px', to: '0px', ease: C('fold'), note: 'grid-template-columns 1fr → 0fr, so the text clips instead of reflowing.' },
+      { icon: 'size', prop: 'Gap', layer: 'Gallery Label', sel: '.pv__galleryLabel', delay: 5000, dur: 480, from: '8px', to: '0px', ease: C('fold') },
+      { icon: 'size', prop: 'Padding right', layer: 'Gallery Button', sel: '.pv__galleryBtn', delay: 5000, dur: 480, from: '16px', to: '8px', ease: C('fold'), note: 'The pill goes 137 → 69px wide: just the photo stack.' },
+      { icon: 'opacity', prop: 'Opacity', layer: 'Gallery Label', sel: '.pv__galleryLabel', delay: 5000, dur: 220, from: '1', to: '0', ease: C('ease'), note: 'The text fades a little ahead of the fold.' },
+    ] },
+    { id: 10, name: 'Gallery button hover', trig: 'Pointer enters the Gallery button', rows: () => {
+      const card = (layer, nth, r, w, delay) => ({ icon: 'scale', prop: 'Rotation', layer, sel: `.pv__stackCard[data-card="${nth}"]`, delay, dur: 620, from: `${r}deg`, to: `${+(r + w).toFixed(2)}deg`, approx: false,
+        ease: { kind: 'custom', label: 'Wiggle', tag: 'Wiggle',
+          info: [['Swing w', `${w > 0 ? '+' : ''}${w}°`], ['Each leg', 'cubic-bezier(0.37, 0, 0.3, 1)', true], ['Keyframes', '+w 28% · −0.45w 56% · +0.15w 80% · 0', true]],
+          code: '@keyframes pv-stack-wiggle { 28% { rotate: r + w; translate: dx −1px } 56% { rotate: r − 0.45w } 80% { rotate: r + 0.15w } }',
+          plot: { span: 1, f: (t) => { const seg = [[0, 0], [0.28, 1], [0.56, -0.45], [0.8, 0.15], [1, 0]]; for (let k = 1; k < seg.length; k++) if (t <= seg[k][0]) { const [a, ya] = seg[k - 1], [b, yb] = seg[k]; return ya + (yb - ya) * WIG((t - a) / (b - a)); } return 0; } } } });
+      return [
+        { icon: 'opacity', prop: 'Background', layer: 'Gallery Button', sel: '.pv__galleryBtn', delay: 0, dur: 150, from: 'white 12%', to: 'white 18%', ease: C('ease') },
+        card('Front Card (photo 1)', 0, -16.94, -7, 0), card('Middle Card (photo 2)', 1, -11.34, -2.5, 35), card('Back Card (photo 3)', 2, -5.63, 6, 70),
+        { icon: 'move', prop: 'Move X · Y', layer: 'Stack Cards', sel: '.pv__stackCard', delay: 0, dur: 690, from: '0, 0', to: '±1.5px, −1px', ease: C('lin'), note: 'Each card also nudges ±1.5px sideways and 1px up at the 28% peak. Off under reduced motion; plays once per hover.' },
+      ];
+    } },
+    { id: 11, name: 'Gallery tile hover', trig: 'Pointer over a gallery photo', rows: () => [
+      { icon: 'scale', prop: 'Photo Zoom', layer: 'Tile Photo', sel: '.pv__tile[data-spec-hover] img', delay: 0, dur: 420, from: '100%', to: '105%', ease: C('quint'),
+        note: 'The photo eases in inside its tile (overflow clipped, tile size unchanged) to show which one you’re about to open; same on keyboard focus.' },
+    ] },
+    { id: 12, name: 'Mark helpful', trig: 'Click the helpful button', rows: () => [
+      { icon: 'scale', prop: 'Scale', layer: 'Thumbs-up Icon', sel: '.pv__reviewStack .pv__likeIcon', delay: 0, dur: 360, from: '100%', to: '118%',
+        ease: { kind: 'custom', label: 'Pop', tag: 'Pop', info: [['Peak', '118% at 40%'], ['Easing', 'cubic-bezier(0.34, 1.56, 0.64, 1)', true]], code: '@keyframes pv-like-pop { 40% { scale: 1.18 } }',
+          plot: { span: 1, f: (t) => (t < 0.4 ? POP(t / 0.4) : 1 - POP((t - 0.4) / 0.6)) } },
+        note: 'The icon swaps to the filled thumbs-up and pops; the count goes up by one. Clicking again un-marks it.' },
+    ] },
+  ];
+
+  // the journey the Overview plays
+  function overview(v) {
+    const end = (id) => sceneEnd(SCENES[id].rows(v));
+    const at = { 1: 0 }; at[2] = 900; at[3] = at[2] + end(2) + 500; at[5] = at[3] + end(3) + 600; at[6] = at[5] + end(5) + 700; at[8] = at[6] + end(6) + 900;
+    const rows = [1, 2, 3, 5, 6, 8].map((id) => ({ icon: 'flag', prop: `${id}`, layer: SCENES[id].name, sel: null, delay: at[id], dur: end(id), scene: id, from: '', to: '', ease: { kind: 'scene' }, note: `${SCENES[id].trig}.` }));
+    const key = (k) => (d, w) => w.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true }));
+    const beats = [
+      { at: at[1], fire: (d) => d.querySelector('.cp__tile[data-index="2"]').click() },
+      { at: at[2], fire: key('ArrowRight') },
+      { at: at[3], fire: key('ArrowRight') },
+      { at: at[5], fire: (d) => d.querySelector('.pv__galleryBtn').click() },
+      { at: at[6], fire: (d) => d.querySelector('.pv__tile[data-index="5"]').click() },
+      { at: at[8], fire: key('Escape') },
+    ];
+    return { rows, beats };
+  }
+
+  /* ═══ states, fast-forwarded on the virtual clock from a fresh load ═══ */
+  const settled = (d) => { const pv = d.querySelector('.pv'); return !!pv && !d.querySelector('.pv__flyer') && pv.getAnimations({ subtree: true }).every((a) => a.playState === 'finished'); };
+  const decode = async (w, src) => { if (!src) return; const im = new w.Image(); im.src = src; try { await im.decode(); } catch (_) {} };
+  const stripSrc = (d, i) => d.querySelector(`.cp__tile[data-index="${i}"] img`)?.src;
+  const ST = {
+    async pdp(d, w, e) { d.querySelector('.cp__tile[data-index="2"]').scrollIntoView({ block: 'center' }); await e.advanceTo(e.vt + 200, 48); },
+    async photo(d, w, e) { await ST.pdp(d, w, e); d.querySelector('.cp__tile[data-index="2"]').click(); await e.stepUntil(() => settled(d));
+      await decode(w, stripSrc(d, 3)); await decode(w, stripSrc(d, 4)); },
+    async review3(d, w, e) { await ST.photo(d, w, e); w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+      await e.stepUntil(() => settled(d) && d.querySelector('.pv__thumb[aria-current]') === d.querySelectorAll('.pv__thumb')[1]); await e.advanceTo(e.vt + 400, 48); await decode(w, stripSrc(d, 4)); },
+    async grid(d, w, e) { await ST.photo(d, w, e); d.querySelector('.pv__galleryBtn').click(); await e.stepUntil(() => settled(d) && !!d.querySelector('.pv__gridMode') && !d.querySelector('.pv__photoMode')); },
+    async folded(d, w, e) { await ST.photo(d, w, e); await e.stepUntil(() => !d.querySelector('.pv__galleryBtn[data-labelled]') && settled(d)); },
+    async wide(d, w, e) {   // photo 66 (portrait), next is 67 (landscape)
+      await ST.pdp(d, w, e); d.querySelector('.cp__tile--more, .cp__galleryBtn').click(); await e.stepUntil(() => settled(d) && !!d.querySelector('.pv__tile[data-index="66"]'));
+      const next = d.querySelector('.pv__tile[data-index="66"] img').src, tile = d.querySelector('.pv__tile[data-index="65"]');
+      tile.scrollIntoView({ block: 'center' }); await e.advanceTo(e.vt + 100, 48); tile.click(); await e.stepUntil(() => settled(d) && !!d.querySelector('.pv__photoMode') && !d.querySelector('.pv__gridMode'));
+      await decode(w, next); },
+  };
+  const PREP = { 0: 'pdp', 1: 'pdp', 2: 'photo', 3: 'review3', 4: 'wide', 5: 'photo', 6: 'grid', 7: 'pdp', 8: 'photo', 9: 'pdp', 10: 'folded', 11: 'grid', 12: 'photo' };
+  const key = (k) => (d, w) => w.dispatchEvent(new w.KeyboardEvent('keydown', { key: k, bubbles: true }));
+  const FIRE = {
+    1: (d) => d.querySelector('.cp__tile[data-index="2"]').click(),
+    2: key('ArrowRight'), 3: key('ArrowRight'), 4: key('ArrowRight'),
+    5: (d) => d.querySelector('.pv__galleryBtn').click(),
+    6: (d) => d.querySelector('.pv__tile[data-index="3"]').click(),
+    7: (d) => d.querySelector('.cp__tile--more, .cp__galleryBtn').click(),
+    8: key('Escape'),
+    9: (d) => d.querySelector('.cp__tile[data-index="2"]').click(),
+    10: (d) => d.querySelector('.pv__galleryBtn').setAttribute('data-spec-hover', ''),
+    11: (d) => d.querySelector('.pv__tile[data-index="3"]').setAttribute('data-spec-hover', ''),
+    12: (d) => d.querySelector('.pv__reviewStack .pv__like').click(),
+  };
+
+  return {
+    title: 'Image View — Animation Spec', device: { w: 1440, h: 900, label: 'Desktop (1440×900)' },
+    legend: { approx: 'timing varies at runtime (≈)' },
+    paths: PATHS, iterations: ITER, springs: SPR, curves: CURVE, scenes: SCENES, overview, states: ST, prep: PREP, fire: FIRE,
+  };
+})();
+</script>
+
+<script>
+/* ═══ SPEC SHEET ENGINE — identical in every project (copy as-is; configure via window.SPEC) ═══ */
+(() => {
+  const { paths: PATHS, iterations: ITER, springs: SPR, curves: CURVE, scenes: SCENES, overview, states: ST, prep: PREP, fire: FIRE } = window.SPEC;
+  const { springFn, rowEnd, sceneEnd } = window.SpecKit;
+  const DW = (window.SPEC.device || {}).w || 375, DH = (window.SPEC.device || {}).h || 812;
+  /* ═══ helpers ═══════════════════════════════════════════════════════════ */
+  const $ = (id) => document.getElementById(id);
+  const fmtS = (ms) => `${(+(ms / 1000).toFixed(2))}s`;
+  const fmtMs = (ms) => `${Math.round(ms)}ms`;
+  const ICON = {
+    scale: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M4 16 16 4M4 16v-5M4 16h5M16 4h-5M16 4v5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    opacity: '<svg width="20" height="20" viewBox="0 0 20 20"><g fill="currentColor"><rect x="3" y="3" width="4" height="4"/><rect x="11" y="3" width="4" height="4"/><rect x="7" y="7" width="4" height="4"/><rect x="15" y="7" width="2" height="4"/><rect x="3" y="11" width="4" height="4"/><rect x="11" y="11" width="4" height="4"/><rect x="7" y="15" width="4" height="2"/></g><g fill="#c7c7cc"><rect x="7" y="3" width="4" height="4"/><rect x="3" y="7" width="4" height="4"/><rect x="11" y="7" width="4" height="4"/><rect x="7" y="11" width="4" height="4"/><rect x="15" y="11" width="2" height="4"/></g></svg>',
+    move: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2v16M2 10h16" stroke="currentColor" stroke-width="1.6"/><path d="m10 1.5 2.4 3H7.6zM10 18.5l2.4-3H7.6zM1.5 10l3-2.4v4.8zM18.5 10l-3-2.4v4.8z" fill="currentColor"/></svg>',
+    size: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2.5v15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="m6.5 6 3.5-3.5L13.5 6M6.5 14l3.5 3.5 3.5-3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 2.5h14M3 17.5h14" stroke="#c7c7cc" stroke-width="1.4"/></svg>',
+    haptic: '<svg width="20" height="20" viewBox="0 0 20 20" fill="none"><rect x="6.5" y="3" width="7" height="14" rx="1.8" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 7v6M1.5 8.5v3M16.5 7v6M18.5 8.5v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>',
+    flag: '<svg width="18" height="16" viewBox="0 0 18 16"><path d="M2 1v14" stroke="currentColor" stroke-width="2"/><path d="M3 1.5h12l-3 4 3 4H3z" fill="currentColor"/></svg>',
+  };
+  function linearAt(fn, u) {
+    const parts = fn.replace(/^linear\(|\)$/g, '').split(',').map((s) => s.trim().split(/\s+/));
+    const pts = parts.map((p) => ({ y: +p[0], x: p[1] ? parseFloat(p[1]) / 100 : null }));
+    pts[0].x ??= 0; pts[pts.length - 1].x ??= 1;
+    for (let i = 1; i < pts.length - 1; i++) if (pts[i].x == null) { let j = i; while (pts[j].x == null) j++; const a = pts[i - 1].x, b = pts[j].x; for (let k = i; k < j; k++) pts[k].x = a + ((b - a) * (k - i + 1)) / (j - i + 1); }
+    for (let i = 1; i < pts.length; i++) if (u <= pts[i].x) { const p = pts[i - 1], q = pts[i]; return p.y + ((q.y - p.y) * (u - p.x)) / ((q.x - p.x) || 1); }
+    return 1;
+  }
+  function springProgress(e) { const s = SPR[e.k], x0 = e.x0 ?? -1, f = springFn(s.w, s.z, x0, e.v0 ?? 0); return (t) => 1 - f.d(t) / x0; }
+  function springStats(e) {
+    const p = springProgress(e); let peak = 0, settle = 0;
+    for (let t = 0; t < 4; t += 0.001) { const y = p(t); peak = Math.max(peak, y); if (Math.abs(1 - y) > 0.01) settle = t; }
+    return { overshoot: Math.max(0, peak - 1) * 100, settle: settle * 1000 };
+  }
+
+  /* ═══ state ═══════════════════════════════════════════════════════════════ */
+  const qs = new URLSearchParams(location.search);
+  let v = +qs.get('v') || 1; if (!PATHS[v]) v = 1;
+  let sc = qs.has('s') ? +qs.get('s') : 0; if (!SCENES[sc]) sc = 0;
+  let rows = [], beats = [], END = 2000, selected = -1, layerFilter = '';
+  const SPEEDS = [1, 0.5, 0.25]; let speedIdx = 0;
+
+  /* ═══ flow list + timeline ═══════════════════════════════════════════════ */
+  const esc = (t) => String(t).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  // the layers a scene animates, in timeline order: [name, { sels, n }]
+  const layersOf = (rs) => { const m = new Map();
+    rs.forEach((r) => { if (r.grp || r.scene != null || !r.sel) return; const e = m.get(r.layer) || { sels: new Set(), n: 0 }; e.sels.add(r.sel); e.n++; m.set(r.layer, e); });
+    return [...m.entries()]; };
+  const LAYER_ICO = '<svg class="tree__ico" viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="1" stroke="currentColor" stroke-width="1.3" stroke-dasharray="2.2 1.8"/></svg>';
+  let treeOpenedFor = null, treeOpenedAt = 0;                   // the tree animates in when its scene opens, not on every selection
+  function renderFlow() {
+    if (treeOpenedFor !== sc) { treeOpenedFor = sc; treeOpenedAt = performance.now(); }
+    const fresh = performance.now() - treeOpenedAt < 300;
+    $('flow').innerHTML = SCENES.map((s) => {
+      const len = s.overview ? sceneEnd(overview(v).rows) : sceneEnd(s.rows(v));
+      const kids = s.id === sc && !s.overview ? layersOf(rows) : [];
+      const curLayer = view === 'track' && rows[selected] ? rows[selected].layer : null;
+      return `<li${kids.length ? ' class="is-open"' : ''}><button data-s="${s.id}" aria-pressed="${s.id === sc && view === 'scene'}" aria-current="${s.id === sc}"${kids.length ? ' aria-expanded="true"' : ''}><span class="n">${String(s.id).padStart(2, '0')}</span>
+        <span class="nm">${s.name}${s.varies ? '<span class="tag tag--warm">varies</span>' : ''}</span><span class="len">${fmtS(len)}</span>
+</button>${kids.length ? `
+        <ul class="tree${fresh ? ' is-new' : ''}" role="group" aria-label="Layers in ${esc(s.name)}">${kids.map(([l, e]) => `<li><button data-l="${esc(l)}" aria-pressed="${view === 'layer' && layerView === l}"${curLayer === l ? ' data-cur' : ''}>${LAYER_ICO}<span class="tree__nm">${l}</span><span class="tree__n">${e.n}</span></button></li>`).join('')}</ul>` : ''}</li>`;
+    }).join('');
+  }
+  const pct = (ms) => `${(ms / END) * 100}%`;
+  function bars(r) {
+    const lbl = (ms) => (ms / END) * 1000 > 34;
+    const tight = r.marks && rowEnd(r) / END > 0.8;
+    const sum = r.stagger ? `${fmtS(r.dur)} · ×${r.stagger.n} / ${r.stagger.step}ms`
+      : r.marks && r.ease.kind === 'haptic' ? `${r.marks.length > 1 ? `×${r.marks.length} · ` : ''}${r.ease.style}${r.ease.intensity ? ` @${r.ease.intensity}` : ''}`
+      : r.marks ? (r.marks.length > 1 ? `×${r.marks.length} · ${r.ease.ms}ms each` : `${r.ease.ms}ms`) : '';
+    let h = r.delay > 0 ? `<div class="bar bar--delay" style="left:0;width:${pct(r.delay)}">${lbl(r.delay) ? `<span>${r.approx ? '≈' : ''}${fmtS(r.delay)}${tight ? ` → ${sum}` : ''}</span>` : ''}</div>` : '';
+    if (r.marks) {
+      h += r.marks.map((m) => `<div class="bar bar--mark" style="left:${pct(m)}"></div>`).join('');
+      if (!tight) h += `<span class="after" style="left:${pct(Math.max(...r.marks))}">${sum}</span>`;
+    } else if (r.stagger) {
+      // one clean bar from the first element's start to the last one's end; the step count and gap
+      // ride in the label (inside when the bar has room, else just after it)
+      const span = rowEnd(r) - r.delay, roomy = span / END > 0.3;
+      h += `<div class="bar bar--dur" style="left:${pct(r.delay)};width:${pct(Math.min(span, END - r.delay))}">${roomy ? `<span>${sum}</span>` : ''}</div>`;
+      if (!roomy) h += `<span class="after" style="left:${pct(rowEnd(r))}">${sum}</span>`;
+    } else {
+      const cls = r.scene != null ? ' bar--scene' : r.approx ? ' bar--approx' : r.repeat ? ' bar--repeat' : '';
+      h += `<div class="bar bar--dur${cls}" style="left:${pct(r.delay)};width:${pct(Math.min(r.dur, END - r.delay))}">${lbl(r.dur) ? `<span>${r.approx ? '≈' : ''}${fmtS(r.dur)}${r.repeat ? ' ↻' : ''}</span>` : ''}</div>`;
+    }
+    return h;
+  }
+  // R20 · two properties on one layer with identical timing (delay, duration, stagger) are one row:
+  // "Scale · Move Y". Only within a group, never for haptics or marks; each keeps its own values in .parts
+  function mergeRows(src) {
+    const out = [], seen = new Map();
+    const key = (r) => [r.layer, r.sel, Math.round(r.delay), Math.round(r.dur), r.stagger ? `${r.stagger.n}/${r.stagger.step}/${r.stagger.order}` : '', !!r.approx, !!r.repeat].join('|');
+    src.forEach((r) => {
+      if (r.grp) { seen.clear(); out.push(r); return; }
+      if (r.marks || r.scene != null || r.ease.kind === 'haptic') { out.push(r); return; }
+      const k = key(r), m = seen.get(k);
+      if (!m) { const row = { ...r, parts: [r] }; seen.set(k, row); out.push(row); return; }
+      m.parts.push(r); m.prop = m.parts.map((x) => x.prop).join(' · ');
+    });
+    out.forEach((r) => { if (r.parts && r.parts.length < 2) delete r.parts; });
+    return out;
+  }
+  function renderTimeline() {
+    const S0 = SCENES[sc];
+    if (S0.overview) { const o = overview(v); rows = o.rows; beats = o.beats; } else { rows = mergeRows(S0.rows(v)); beats = []; }
+    const last = sceneEnd(rows);
+    const unit = last > 6000 ? 1000 : last > 2400 ? 500 : 100;
+    END = Math.ceil((last + Math.max(60, last * 0.05)) / unit) * unit;
+    let s = `<span class="tick tick--zero" style="left:0">0</span>`;
+    const minor = unit === 1000 ? 500 : 100, major = unit === 1000 ? 1000 : 500;
+    for (let t = minor; t < END; t += minor) s += `<span class="tick tick--minor" style="left:${pct(t)}">.</span>`;
+    for (let t = major; t < END; t += major) if (Math.abs(t - last) > END * 0.04) s += `<span class="tick" style="left:${pct(t)};color:var(--ink-3)">${fmtS(t)}</span>`;
+    s += `<span class="tick" style="left:${pct(last)}">${fmtS(last)}</span>`;
+    $('scale').innerHTML = s;
+    $('trigger').textContent = `· ${S0.trig}`;
+    $('rows').innerHTML = rows.map((r, i) => r.grp
+      ? `<div class="grp"><b>${r.grp}</b><span>@ ${fmtMs(r.at)}</span></div>`
+      : `<div class="row" role="button" tabindex="0" data-i="${i}" aria-selected="false">
+           <div class="row__lab">${ICON[r.icon]}<b>${r.scene != null ? `<em>${r.prop.padStart(2, '0')}</em>` : r.prop}</b><span>${r.layer}</span></div>
+           <div class="row__trk">${bars(r)}</div></div>`).join('');
+    applyFilter();
+    showScene();
+    $('title').textContent = window.SPEC.title;
+    $('back').href = PATHS[v];
+    setHead(END); renderFlow();
+  }
+  function applyFilter() {
+    document.querySelectorAll('.row').forEach((el) => el.classList.toggle('is-dim', !!layerFilter && rows[+el.dataset.i].layer !== layerFilter));
+  }
+  function setHead(ms) { $('head').style.left = `${Math.min(1, Math.max(0, ms / END)) * 100}%`; }
+
+  /* ═══ inspector ═══════════════════════════════════════════════════════════ */
+  function easeFn(r) {
+    const e = r.ease;
+    if (e.kind === 'spring') return { f: springProgress(e), span: r.dur / 1000 };
+    if (e.kind === 'curve') return { f: (t) => linearAt(CURVE[e.k].fn, t), span: 1 };
+    if (e.kind === 'custom' && e.plot) return { f: e.plot.f, span: e.plot.span };
+    return null;
+  }
+  function plot(r) {
+    const E = easeFn(r); if (!E) return '';
+    const W = 336, H = 112, pad = 10, N = 140;
+    const ys = Array.from({ length: N + 1 }, (_, k) => E.f((k / N) * E.span));
+    const lo = Math.min(0, ...ys), hi = Math.max(1, ...ys);
+    const X = (k) => pad + ((W - 2 * pad) * k) / N, Y = (y) => H - pad - ((H - 2 * pad) * (y - lo)) / (hi - lo);
+    const d = ys.map((y, k) => `${k ? 'L' : 'M'}${X(k).toFixed(1)},${Y(y).toFixed(1)}`).join('');
+    return `<svg class="insp__plot" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+      <line x1="${pad}" x2="${W - pad}" y1="${Y(1)}" y2="${Y(1)}" style="stroke:var(--line-strong)"/>
+      <line x1="${pad}" x2="${W - pad}" y1="${Y(0)}" y2="${Y(0)}" style="stroke:var(--line-strong)"/>
+      <path d="${d}" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`;
+  }
+  /* ═══ inspector: one view per thing selected on the left — scene → layer → animation ═══
+     Its header is the Flow card's (title · chip); values read like ProtoPie's, the label
+     beside the value and the value in the accent, grouped Values · Timing · Easing.    */
+  let view = 'scene';                                           // 'scene' | 'layer' | 'track'
+  const nn = (n) => String(n).padStart(2, '0');
+  const kv = (items) => `<dl class="kv">${items.filter(Boolean).map(([k, val, wide]) => `<div${wide ? ' class="wide"' : ''}><dt>${k}</dt><dd>${val}</dd></div>`).join('')}</dl>`;
+  const sec = (title, inner, count) => `<section class="isec"><p class="isec__h">${title}${count != null ? `<span class="count">${count}</span>` : ''}</p>${inner}</section>`;
+  // the same header the Flow card uses: title, then an optional chip
+  const head = (title, chip = '') => `<header class="card__head"><h3 class="card__title">${title}</h3>${chip}</header>`;
+  // ProtoPie-style easing: FUNCTION(Arg value, …) — the function in violet, the numbers in the accent
+  const xfn = (name, args = []) => `<span class="x"><span class="x-fn">${name}</span>${args.length ? `(${args.map(([k, val]) => `${k ? `${k} ` : ''}<span class="x-n">${val}</span>`).join(', ')})` : ''}</span>`;
+  const CURVE_X = { lin: 'LINEAR', out: 'EASE-OUT', io: 'EASE-IN-OUT' };
+  function exprOf(r) {
+    const e = r.ease;
+    if (e.kind === 'spring') { const s = SPR[e.k]; return xfn('SPRING', [['Tension', (s.w * s.w).toFixed(2)], ['Friction', (2 * s.z * s.w).toFixed(2)]]); }
+    if (e.kind === 'curve') return CURVE_X[e.k] ? xfn(CURVE_X[e.k]) : xfn('CURVE', [['', CURVE[e.k].name.replace(/\s*\(.*\)$/, '')]]);
+    if (e.kind === 'custom') return xfn('CUSTOM', [['', e.tag || e.label]]);
+    if (e.kind === 'haptic') return xfn('HAPTIC', [['', `${e.style}${e.intensity ? ` @${e.intensity}` : ''}`]]);
+    return '';
+  }
+  // the value at the playhead, for numeric from → to (same unit); null when it isn't a number
+  const numUnit = (t) => { const m = String(t).replace(/−/g, '-').trim().match(/^(-?\d*\.?\d+)\s*(px|%|deg|ms|s)?$/); return m ? [+m[1], m[2] || ''] : null; };
+  function currentOf(x, T) {
+    const a = numUnit(x.from), b = numUnit(x.to), E = easeFn(x); if (!a || !b || a[1] !== b[1] || !E) return null;
+    let u = (T - x.delay) / x.dur; u = x.repeat && u > 1 ? u % 1 : Math.min(1, Math.max(0, u));
+    if (u >= 1 && !x.repeat) return x.to.replace(/−/g, '-');
+    const pr = u <= 0 ? 0 : E.f(u * E.span);
+    return `${(Math.round((a[0] + (b[0] - a[0]) * pr) * 10) / 10).toString().replace(/^-0$/, '0')}${a[1]}`;
+  }
+  const live = (i, k = 0) => `<span class="live" data-live="${i}" data-part="${k}">—</span>`;
+  function fillLive() {
+    const T = Math.max(0, lastShown);
+    document.querySelectorAll('#insp [data-live]').forEach((el) => { const r = rows[+el.dataset.live]; if (!r) return;
+      const x = (r.parts || [r])[+el.dataset.part]; el.textContent = currentOf(x, T) ?? '—'; });
+  }
+  function easeOf(r) {                                          // → { name, tag, items, code }
+    const e = r.ease;
+    if (e.kind === 'spring') {
+      const s = SPR[e.k], st = springStats(e);
+      return { name: exprOf(r), tag: s.name, code: '',
+        items: [['Overshoot', st.overshoot < 0.05 ? 'none' : st.overshoot.toFixed(1) + '%'],
+          ['Settles', fmtMs(st.settle)], ['ω · ζ', `${s.w} rad/s · ${s.z}`, true], e.v0 && ['Initial velocity', `${e.v0} px/s`, true]] };
+    }
+    if (e.kind === 'curve') return { name: exprOf(r), tag: CURVE[e.k].name, items: [], code: CURVE[e.k].fn };
+    if (e.kind === 'custom') return { name: exprOf(r), tag: e.label, items: (e.info || []).map(([k, val]) => [k, val]), code: e.code || '' };
+    if (e.kind === 'haptic') return { name: exprOf(r), tag: '',
+      items: [['iOS', e.gen, true], ['Android', `vibrate(${e.vibe})`, true], ['iOS Safari', `native switch toggle${e.name === 'success' ? ' ×2' : ''}`, true],
+        r.marks.length > 1 && ['Pulses', `${r.marks.map((m) => Math.round(m)).join(', ')} ms`, true]],
+      code: `${e.call} → webkit.messageHandlers.haptic.postMessage(${JSON.stringify(e.intensity ? { type: e.style, intensity: e.intensity } : e.style)})` };
+    return { name: '', items: [], code: '' };
+  }
+  const easeSec = (r, title) => { const b = easeOf(r), items = b.items.filter(Boolean);
+    return sec(`${title || (r.ease.kind === 'haptic' ? 'Feedback' : 'Easing')}${b.tag ? `<span class="tag">${b.tag}</span>` : ''}`,
+      `${b.name ? `<p class="isec__name">${b.name}</p>` : ''}${plot(r)}${items.length ? kv(items) : ''}${b.code ? `<code class="insp__code">${b.code}</code>` : ''}`); };
+  const list = (items) => `<ol class="anims">${items.join('')}</ol>`;
+  function clearRowSel() { document.querySelectorAll('.row').forEach((el) => el.setAttribute('aria-selected', 'false')); }
+
+  // scene view — what is selected when a scene is picked in the Flow list
+  function showScene() {
+    view = 'scene'; layerView = null; selected = -1; clearRowSel();
+    const S0 = SCENES[sc], len = fmtS(sceneEnd(rows));
+    if (S0.overview) {
+      const scs = rows.filter((r) => r.scene != null);
+      $('insp').innerHTML = `${head(S0.name)}
+        ${sec('Summary', kv([['Length', len], ['Scenes', scs.length]]))}
+        ${sec('Scenes', list(scs.map((r) => `<li><button data-go="${r.scene}"><span class="n">${nn(r.scene)}</span><span class="anims__main"><b>${r.layer}</b></span><span class="anims__t">${fmtS(r.dur)}</span></button></li>`)), scs.length)}`;
+    } else {
+      const ls = layersOf(rows), n = rows.filter((r) => !r.grp).length;
+      $('insp').innerHTML = `${head(S0.name, S0.varies ? '<span class="tag tag--warm">varies</span>' : '')}
+        ${sec('Summary', kv([['Length', len], ['Layers', ls.length], ['Animations', n]]))}
+        ${sec('Layers', list(ls.map(([l, e]) => `<li><button data-l="${esc(l)}">${LAYER_ICO}<span class="anims__main"><b>${l}</b></span><span class="anims__t">${e.n}</span></button></li>`)), ls.length)}`;
+    }
+    highlight(null); renderFlow();
+  }
+
+  // animation view — a timeline row
+  function select(i) {
+    if (i < 0 || !rows[i] || rows[i].grp) return;
+    selected = i; layerView = null; view = 'track';
+    document.querySelectorAll('.row').forEach((el) => el.setAttribute('aria-selected', String(+el.dataset.i === i)));
+    const r = rows[i];
+    if (r.scene != null) {                                      // a scene, on the Overview timeline
+      const sr = SCENES[r.scene].rows(v).filter((x) => !x.grp);
+      $('insp').innerHTML = `${head(`${nn(r.scene)} ${r.layer}`)}
+        ${sec('Summary', kv([['Starts', fmtMs(r.delay)], ['Length', fmtMs(r.dur)], ['Animations', sr.length], ['Layers', [...new Set(sr.map((x) => x.layer))].join(', '), true]]))}
+        <button class="insp__go" data-go="${r.scene}">Open scene ${nn(r.scene)} →</button>`;
+      highlight(null); renderFlow(); return;
+    }
+    const parts = r.parts || [r], same = parts.every((x) => JSON.stringify(x.ease) === JSON.stringify(parts[0].ease));
+    const values = r.parts ? kv(parts.flatMap((x, k) => [[x.prop, `${x.from} → ${x.to}`, true], [`${x.prop} now`, live(i, k), true]])) : kv([['From', r.from], ['To', r.to], ['Current', live(i)]]);
+    const timing = kv([['Delay', `${r.approx ? '≈ ' : ''}${fmtMs(r.delay)}`], ['Duration', `${fmtMs(r.dur)}${r.repeat ? ' · repeats' : ''}`],
+      ['Ends', `${r.approx ? '≈ ' : ''}${fmtMs(rowEnd(r))}`], r.stagger && ['Stagger', `×${r.stagger.n} · ${r.stagger.step}ms · ${r.stagger.order}`, true]]);
+    $('insp').innerHTML = `${head(`${r.prop}<small>${r.layer}</small>`)}
+      ${r.from === '—' ? '' : sec('Values', values)}
+      ${sec('Timing', timing)}
+      ${same ? easeSec(parts[0]) : parts.map((x) => easeSec(x, `Easing · ${x.prop}`)).join('')}`;
+    fillLive(); highlight(r.sel); renderFlow();
+  }
+
+  /* ═══ layer view: what ProtoPie shows for a selected layer, measured live ═══
+     Geometry is read off the prototype on screen at the playhead (device points,
+     the screen is 375pt wide), so it follows the animation as you scrub.     */
+  let layerView = null, propsAt = -1;
+  const num = (n) => (Math.round(n * 10) / 10).toString().replace(/^-0$/, '0');
+  function layerSel(name) { const e = layersOf(rows).find(([l]) => l === name); return e ? [...e[1].sels].join(', ') : ''; }
+  function measure(name) {
+    const D = disp(); if (!D) return null;
+    let els = []; try { els = [...D.d.querySelectorAll(layerSel(name))]; } catch (_) {}
+    const el = els.find((x) => x.getBoundingClientRect().width > 0) || els[0];
+    if (!el) return { count: 0 };
+    const b = el.getBoundingClientRect(), cs = D.d.defaultView.getComputedStyle(el);
+    const rad = cs.borderTopLeftRadius;
+    return { count: els.length, x: b.left, y: b.top, w: b.width, h: b.height, o: +cs.opacity, r: rad.endsWith('%') ? rad : num(parseFloat(rad) || 0) };
+  }
+  function fillProps() {
+    const box = $('layerProps'); if (!box || !layerView) return;
+    const m = measure(layerView), shown = Math.max(0, lastShown);
+    const cell = (k, val) => `<div><dt>${k}</dt><dd>${val}</dd></div>`;
+    if (!m) { box.innerHTML = cell('X', '…') + cell('Y', '…') + cell('Width', '…') + cell('Height', '…') + cell('Opacity', '…') + cell('Radius', '…'); $('layerAt').textContent = 'Loading…'; return; }
+    if (!m.count) { box.innerHTML = ''; $('layerAt').textContent = `Not on screen at ${fmtS(shown)}`; return; }
+    box.innerHTML = cell('X', num(m.x)) + cell('Y', num(m.y)) + cell('Width', num(m.w)) + cell('Height', num(m.h)) + cell('Opacity', `${num(m.o * 100)}%`) + cell('Radius', m.r);
+    $('layerAt').textContent = `At ${fmtS(shown)} on the playhead · pt${m.count > 1 ? ` · first of ${m.count} elements` : ''}`;
+  }
+  function showLayer(name) {
+    layerFilter = name; layerView = name; view = 'layer'; selected = -1; propsAt = -1; clearRowSel();
+    applyFilter();
+    $('insp').innerHTML = `${head(name, '<span class="tag">Layer</span>')}
+      ${sec('Layer properties', `<dl class="kv" id="layerProps"></dl><p class="insp__cap" id="layerAt"></p>`)}`;
+    fillProps(); fillLive(); highlight(layerSel(name)); renderFlow();
+  }
+
+  /* ═══ live preview — the real prototype on a virtual clock ═══════════════
+     Each preview frame gets its own clock: performance.now, rAF, setTimeout and
+     every animation in it (WAAPI and CSS) run off virtual time, stepped one
+     60fps frame at a time with timers and animation ends fired in order. So the
+     scene can play at any speed, pause on an exact millisecond, and jump
+     forward instantly — that is what makes the playhead draggable. Dragging
+     back swaps in a standby frame (already set up just before the trigger)
+     and fast-forwards it; a fresh standby is prepared behind it. app.js is
+     never modified — the frame is only driven from here.                   */
+  const phone = $('phone');
+  const mc = new MessageChannel(); let mq = [];
+  mc.port1.onmessage = () => { const q = mq; mq = []; q.forEach((f) => f()); };
+  const flush = () => new Promise((r) => { mq.push(r); mc.port2.postMessage(0); });   // one task: the frame's microtasks drain
+  const realWait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const FR = 1000 / 60;
+  function installEngine(w) {
+    const d = w.document;
+    let vt = w.performance.now(), fixed = null;
+    const now = () => (fixed ?? vt);
+    w.performance.now = now;
+    // a private history per frame: pushes become replaceState on the real one, so frames never share
+    // the page's joint session history, and popstate is dispatched on the virtual clock
+    const H = w.history, rRep = H.replaceState.bind(H), abs = (u) => (u != null ? new URL(u, w.location.href).href : w.location.href);
+    const stack = [{ state: H.state, url: w.location.href }]; let hi = 0;
+    H.pushState = (st, _t, u) => { stack.length = hi + 1; stack.push({ state: st, url: abs(u) }); hi++; rRep(st, '', abs(u)); };
+    H.replaceState = (st, _t, u) => { stack[hi] = { state: st, url: abs(u) }; rRep(st, '', abs(u)); };
+    const go = (n) => { const j = Math.max(0, Math.min(stack.length - 1, hi + n)); if (j === hi) return; hi = j; rRep(stack[hi].state, '', stack[hi].url);
+      w.setTimeout(() => w.dispatchEvent(new w.PopStateEvent('popstate', { state: stack[hi].state })), 0); };
+    H.back = () => go(-1); H.forward = () => go(1); H.go = (n = 0) => go(n);
+    let tid = 1; const timers = new Map();
+    w.setTimeout = (fn, ms = 0, ...args) => { const id = tid++; if (typeof fn === 'function') timers.set(id, { at: now() + Math.max(0, +ms || 0), fn, args, seq: id }); return id; };
+    w.clearTimeout = (id) => { timers.delete(id); };
+    let rq = [], rid = 1;
+    w.requestAnimationFrame = (cb) => { const id = rid++; rq.push({ id, cb }); return id; };
+    w.cancelAnimationFrame = (id) => { rq = rq.filter((r) => r.id !== id); };
+    const anims = new Map();                                   // Animation → { v0, end }
+    const track = (an, v0) => { try { an.pause(); } catch (_) {} anims.set(an, { v0, end: an.effect ? an.effect.getComputedTiming().endTime : Infinity }); };
+    const rAn = w.Element.prototype.animate;
+    w.Element.prototype.animate = function (...a) { const an = rAn.apply(this, a); track(an, now()); an.currentTime = 0; return an; };
+    const adopt = () => { for (const an of d.getAnimations()) if (!anims.has(an) && an.playState !== 'idle' && an.playState !== 'finished') track(an, now() - (an.currentTime || 0)); };
+    function sync(t, finishOnly = false) {
+      for (const [an, m] of anims) {
+        if (an.playState === 'idle') { anims.delete(an); continue; }
+        const ct = t - m.v0;
+        if (ct >= m.end) { anims.delete(an); try { an.finish(); } catch (_) {} }
+        else if (!finishOnly) an.currentTime = Math.max(0, ct);
+      }
+    }
+    function nextTimer(lim) { let best = null; for (const [id, t] of timers) if (t.at <= lim && (!best || t.at < best.at || (t.at === best.at && t.seq < best.seq))) best = { id, ...t }; return best; }
+    function nextEnd(lim) { let best = Infinity; for (const [an, m] of anims) { if (an.playState === 'idle') continue; const e = m.v0 + m.end; if (e <= lim && e < best) best = e; } return best === Infinity ? null : best; }
+    let lock = Promise.resolve();
+    function advanceTo(T, fr = FR) {
+      const run = async () => {
+        while (vt < T - 1e-6) {
+          const next = Math.min(T, vt + fr);
+          for (let g = 0; g < 400; g++) {                       // timers + animation ends inside this frame, in order
+            const tm = nextTimer(next), ae = nextEnd(next);
+            if (!tm && ae == null) break;
+            if (ae != null && (!tm || ae <= tm.at)) { fixed = Math.max(vt, ae); sync(fixed, true); }
+            else { timers.delete(tm.id); fixed = Math.max(vt, tm.at); try { tm.fn(...tm.args); } catch (e) { console.warn('[preview]', e); } }
+            await flush();
+          }
+          vt = next; fixed = null;
+          adopt(); sync(vt);
+          const q = rq; rq = [];
+          for (const r of q) { try { r.cb(vt); } catch (e) { console.warn('[preview]', e); } }
+          await flush();
+        }
+      };
+      return (lock = lock.then(run, run));
+    }
+    // set-up runs on coarser 48ms frames: springs are evaluated in closed form, so only the end state matters
+    async function stepUntil(cond, max = 12000) { const lim = vt + max; while (!cond()) { if (vt >= lim) throw new Error('timeout'); await advanceTo(vt + 96 * 3, 96); } }
+    return { now, advanceTo, stepUntil, get vt() { return vt; } };
+  }
+  /* ═══ record once, scrub instantly ══════════════════════════════════════════
+     A hidden RECORDER frame (the real prototype on the virtual clock above) plays
+     the scene once, frame by frame (120fps, 60fps for the long overview). Every
+     visual change is logged per element: style / class / hidden attributes,
+     every running animation's computed values (WAAPI, CSS animations incl.
+     ::after, transitions), structural changes, input values and scroll offsets.
+     The visible DISPLAY frame is a static, script-free copy of the recorder's
+     page taken just before the trigger; showing time T = applying each log's
+     value at T. So the screen follows the playhead within the same frame,
+     forwards or backwards, at any speed — playback and scrubbing are one
+     lookup. Recording runs faster than real time, time-sliced so the UI stays
+     smooth; a plain "Loading…" covers the phone until it is done.              */
+  let gen = 0, mode = 'idle', REC = null, playT = 0, headT = null, lastShown = -1, stateCur = '', stateEnd = '';
+  let hlBox = null, hlSel = null, hlAt = -1;
+  const disp = () => (REC && REC.disp ? REC.disp : null);
+  function highlight(sel) {
+    hlSel = sel; const D = disp(); if (!D) return; const d = D.d;
+    if (!hlBox || !hlBox.isConnected) { hlBox = d.createElement('div'); hlBox.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:2147483647'; d.body.appendChild(hlBox); }
+    if (!sel) { hlBox.innerHTML = ''; return; }
+    const els = [...d.querySelectorAll(sel)].slice(0, 12);
+    hlBox.innerHTML = els.map((el) => { const b = el.getBoundingClientRect(); if (!b.width || b.bottom < 0 || b.top > DH) return '';
+      if (el.checkVisibility && !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) return '';
+      return `<i style="position:fixed;left:${b.left}px;top:${b.top}px;width:${b.width}px;height:${Math.max(2, b.height)}px;outline:1.5px solid #277fff;outline-offset:1px;border-radius:2px"></i>`; }).join('');
+  }
+  async function makeFrame() {
+    const scene = sc;
+    const f = document.createElement('iframe'); f.title = 'Recorder'; f.tabIndex = -1; f.setAttribute('aria-hidden', 'true');
+    f.src = PATHS[v] + '?spec=' + Date.now();
+    phone.insertBefore(f, $('veil'));
+    await new Promise((r) => f.addEventListener('load', r, { once: true }));
+    const w = f.contentWindow, eng = installEngine(w);
+    await w.document.fonts.ready;
+    await eng.advanceTo(eng.vt + 100, 48);
+    if (PREP[scene]) await ST[PREP[scene]](w.document, w, eng);
+    return { f, w, eng };
+  }
+  const kebab = (p) => (p === 'cssFloat' ? 'float' : p.replace(/[A-Z]/g, (m) => '-' + m.toLowerCase()));
+  const SKIP = new Set(['offset', 'computedOffset', 'easing', 'composite']);
+  function at(arr, T) { let lo = 0, hi = arr.length - 1, k = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (arr[m][0] <= T) { k = m; lo = m + 1; } else hi = m - 1; } return k < 0 ? arr[0][1] : arr[k][1]; }
+  function push(arr, t, val) { const l = arr[arr.length - 1]; if (l[1] === val) return; if (l[0] === t) l[1] = val; else arr.push([t, val]); }
+  const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
+
+  async function record(g) {
+    const fr = await makeFrame();
+    if (g !== gen) { fr.f.remove(); return; }
+    const { w, eng } = fr, d = w.document;
+    // key every element, then take the static copy the display is built from
+    let K = 0; for (const el of d.querySelectorAll('*')) el.setAttribute('data-sk', K++);
+    const clone = d.documentElement.cloneNode(true);
+    clone.querySelectorAll('script').forEach((s) => s.remove());
+    const head = clone.querySelector('head');
+    const base = d.createElement('base'); base.href = location.origin + PATHS[v]; head.prepend(base);
+    const freeze = d.createElement('style'); freeze.textContent = '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}'; head.append(freeze);
+    const ovs = d.createElement('style'); ovs.id = '__specov'; head.append(ovs);
+    const html = '<!doctype html>' + clone.outerHTML;
+    const pristine = new DOMParser().parseFromString(html, 'text/html');
+    // display frame
+    const df = document.createElement('iframe'); df.title = 'Prototype preview'; df.srcdoc = html;
+    phone.insertBefore(df, $('veil'));
+    await new Promise((r) => df.addEventListener('load', r, { once: true }));
+    if (g !== gen) { fr.f.remove(); df.remove(); return; }
+    const dd = df.contentDocument;
+    await Promise.race([Promise.all([dd.fonts.ready, ...[...dd.images].map((im) => (im.decode ? im.decode().catch(() => {}) : 0))]), realWait(1500)]);
+    // logs, keyed by element
+    const logs = new Map();
+    const R = (sk) => { let r = logs.get(sk); if (!r) logs.set(sk, (r = { ov: new Map(), ps: new Map() })); return r; };
+    const rec = { g, logs, upTo: -1, done: false, disp: { f: df, d: dd, map: new Map(), ov: dd.getElementById('__specov'), css: '' } };
+    // initial input values + scroll offsets
+    const inputs = [...d.querySelectorAll('input, textarea')];
+    const scrollers = [...d.querySelectorAll('*')].filter((el) => { const cs = w.getComputedStyle(el); return /(auto|scroll)/.test(cs.overflowY + cs.overflowX); });
+    if (d.scrollingElement && !scrollers.includes(d.scrollingElement)) scrollers.push(d.scrollingElement);   // the page's own scroll, so a scene set up below the fold shows there
+    inputs.forEach((el) => { R(el.dataset.sk).val = [[-1, el.value]]; });
+    scrollers.forEach((el) => { R(el.dataset.sk).sc = [[-1, `${el.scrollTop},${el.scrollLeft}`]]; });
+    let moBuf = [];
+    const mo = new w.MutationObserver((list) => { moBuf.push(...list); });   // records delivered between captures must not be lost
+    // every attribute, not just style/class/hidden: states kept in data-* / aria-* (e.g. [data-state], [aria-current]) must replay too
+    mo.observe(d, { subtree: true, attributes: true, attributeOldValue: true, childList: true, characterData: true });
+    const propCache = new WeakMap(), active = new Set();
+    function capture(t) {
+      // attributes + structure
+      const dirty = new Set();
+      const muts = moBuf.concat(mo.takeRecords()); moBuf = [];
+      for (const m of muts) {
+        if (m.type === 'attributes') {
+          const el = m.target, name = m.attributeName; if (el === hlBox || name === 'data-sk') continue;
+          let sk = el.getAttribute('data-sk'); if (sk == null) { el.setAttribute('data-sk', sk = String(K++)); }
+          const r = R(sk);
+          if (name !== 'style' && name !== 'class' && name !== 'hidden') {   // any other attribute: its own log
+            if (!r.at) r.at = new Map(); let arr = r.at.get(name); if (!arr) r.at.set(name, (arr = [[-1, m.oldValue]]));
+            push(arr, t, el.getAttribute(name)); continue;
+          }
+          const key = name === 'style' ? 'st' : name === 'class' ? 'cl' : 'hd';
+          if (!r[key]) r[key] = [[-1, m.oldValue]];
+          push(r[key], t, el.getAttribute(name));
+        } else {
+          const p = m.target.nodeType === 1 ? m.target : m.target.parentElement;
+          if (p) dirty.add(p);
+        }
+      }
+      for (const p of dirty) {
+        let a = p.parentElement, covered = false; while (a) { if (dirty.has(a)) { covered = true; break; } a = a.parentElement; }
+        if (covered || !p.isConnected) continue;
+        for (const el of p.querySelectorAll('*')) if (!el.hasAttribute('data-sk')) el.setAttribute('data-sk', String(K++));
+        let sk = p.getAttribute('data-sk'); if (sk == null) continue;
+        const r = R(sk); if (!r.x) { const o = pristine.querySelector(`[data-sk="${sk}"]`); r.x = [[-1, o ? o.innerHTML : '']]; }
+        push(r.x, t, p.innerHTML);
+      }
+      // animated values (computed), incl. pseudo-elements
+      const seen = new Set();
+      for (const an of d.getAnimations()) {
+        const ef = an.effect; if (!ef || !ef.target) continue;
+        const tgt = ef.target, sk = tgt.getAttribute('data-sk'); if (sk == null) continue;
+        let props = propCache.get(an);
+        if (!props) { const s = new Set(); try { for (const kf of ef.getKeyframes()) for (const p in kf) if (!SKIP.has(p)) s.add(kebab(p)); } catch (_) {} if (an.transitionProperty) s.add(an.transitionProperty); propCache.set(an, (props = [...s])); }
+        const pseudo = ef.pseudoElement || '', cs = w.getComputedStyle(tgt, pseudo || null), r = R(sk), map = pseudo ? r.ps : r.ov;
+        for (const p of props) {
+          const key = pseudo ? `${pseudo}|${p}` : p, id = `${sk}#${key}`;
+          let arr = map.get(key); if (!arr) map.set(key, (arr = [[-1, null]]));
+          push(arr, t, cs.getPropertyValue(p)); seen.add(id); active.add(id);
+        }
+      }
+      for (const id of active) if (!seen.has(id)) { active.delete(id); const [sk, key] = id.split('#'); const r = logs.get(sk); const arr = (key.includes('|') ? r.ps : r.ov).get(key); push(arr, t, null); }
+      inputs.forEach((el) => push(logs.get(el.dataset.sk).val, t, el.value));
+      scrollers.forEach((el) => push(logs.get(el.dataset.sk).sc, t, `${el.scrollTop},${el.scrollLeft}`));
+      rec.upTo = t;
+    }
+    REC = rec; hlBox = null; lastShown = -1;
+    df.classList.add('is-front');
+    [...phone.querySelectorAll('iframe.is-front')].forEach((f) => { if (f !== df) f.remove(); });
+    // fire the trigger at Start and record
+    capture(0);
+    const t0 = eng.now();
+    if (SCENES[sc].overview) beats.forEach((bt) => w.setTimeout(() => { try { bt.fire(d, w); } catch (_) {} }, bt.at));
+    else await FIRE[sc](d, w);
+    await flush();
+    const dt = END > 6000 ? 1000 / 60 : 1000 / 120;
+    let slice = performance.now();
+    for (let t = dt; t <= END + dt / 2 && g === gen; t += dt) {
+      await eng.advanceTo(t0 + t, dt);
+      capture(Math.min(t, END));
+      if (performance.now() - slice > 10) { await nextFrame(); slice = performance.now(); }   // keep the page responsive
+    }
+    mo.disconnect();
+    if (g === gen) { rec.upTo = END; rec.done = true; $('veil').hidden = true; if (mode === 'idle') setMode('playing'); }   // ready: lift the veil and play from 0
+    fr.f.remove();                                              // the recording is all the display needs
+  }
+
+  // show time T on the display: each element's logged state at T
+  function applyAt(T) {
+    const D = disp(); if (!D) return;
+    const d = D.d, map = D.map, logs = REC.logs;
+    const elOf = (sk) => { let el = map.get(sk); if (!el || !el.isConnected) { el = d.querySelector(`[data-sk="${sk}"]`); if (el) map.set(sk, el); } return el; };
+    let restruct = false;
+    for (const [sk, r] of logs) if (r.x) { const val = at(r.x, T); if (r.xa !== val) { const el = elOf(sk); if (el) { el.innerHTML = val; restruct = true; } r.xa = val; } }
+    if (restruct) { map.clear(); hlBox = null; for (const r of logs.values()) r.sa = r.ca = r.ha = r.va = r.sca = r.aa = undefined; }
+    let css = '';
+    for (const [sk, r] of logs) {
+      const el = elOf(sk); if (!el) continue;
+      if (r.st || r.ov.size) {
+        if (r.st0 === undefined) r.st0 = el.getAttribute('style') || '';
+        let s = r.st ? at(r.st, T) || '' : r.st0;
+        for (const [p, arr] of r.ov) { const val = at(arr, T); if (val) s += `;${p}:${val}`; }
+        if (s !== r.sa) { if (s) el.setAttribute('style', s); else el.removeAttribute('style'); r.sa = s; }
+      }
+      if (r.cl) { const c = at(r.cl, T); if (c !== r.ca) { if (c == null) el.removeAttribute('class'); else el.setAttribute('class', c); r.ca = c; } }
+      if (r.hd) { const h = at(r.hd, T); if (h !== r.ha) { if (h == null) el.removeAttribute('hidden'); else el.setAttribute('hidden', h); r.ha = h; } }
+      if (r.at) { if (!r.aa) r.aa = new Map();
+        for (const [name, arr] of r.at) { const x = at(arr, T); if (x !== r.aa.get(name)) { if (x == null) el.removeAttribute(name); else el.setAttribute(name, x); r.aa.set(name, x); } } }
+      if (r.val) { const x = at(r.val, T); if (x !== r.va) { el.value = x; r.va = x; } }
+      if (r.sc) { const x = at(r.sc, T); if (x !== r.sca) { const [top, left] = x.split(','); el.scrollTop = +top; el.scrollLeft = +left; r.sca = x; } }
+      for (const [key, arr] of r.ps) { const val = at(arr, T); if (val) { const [ps, p] = key.split('|'); css += `[data-sk="${sk}"]${ps}{${p}:${val}!important}`; } }
+    }
+    if (css !== D.css) { D.ov.textContent = css; D.css = css; }
+  }
+
+  function setMode(m) {
+    mode = m;
+    $('playIco').innerHTML = m === 'playing' ? '<rect x="2" y="1.5" width="4" height="15" rx="1" fill="currentColor"/><rect x="10" y="1.5" width="4" height="15" rx="1" fill="currentColor"/>' : '<path d="M1 1.5v15L15 9z" fill="currentColor"/>';
+    $('play').setAttribute('aria-label', m === 'playing' ? 'Pause' : 'Play');
+  }
+  function paint() {
+    const T = headT ?? playT, up = REC ? (REC.done ? END : Math.max(0, REC.upTo)) : 0;
+    const shown = Math.min(T, up);
+    if (shown !== lastShown) { const c0 = performance.now(); applyAt(shown); if (window.__spec) (window.__spec.cost ||= []).push(performance.now() - c0); lastShown = shown; hlAt = -1; }
+    setHead(T);
+    // fixed-width readout: always two decimals, in a slot as wide as the total, so the bar never resizes
+    const cur = `${(Math.min(T, END) / 1000).toFixed(2)}s`, end = `${(END / 1000).toFixed(2)}s`;
+    if (cur !== stateCur) { $('stateCur').textContent = cur; stateCur = cur; }
+    if (end !== stateEnd) { $('stateEnd').textContent = end; $('stateCur').style.minWidth = `${end.length}ch`; stateEnd = end; }
+    if (hlSel && hlAt !== shown) { highlight(hlSel); hlAt = shown; }
+    if (propsAt !== shown) { if (layerView) fillProps(); fillLive(); propsAt = shown; }
+  }
+  let lastTs = performance.now();
+  function loop(ts) {
+    const dt = Math.min(64, ts - lastTs); lastTs = ts;
+    if (mode === 'playing' && REC) {
+      const up = REC.done ? END : Math.max(0, REC.upTo);
+      playT = Math.min(playT + dt * SPEEDS[speedIdx], END);
+      if (playT > up) playT = up;                               // never run ahead of the recording
+      if (playT >= END) { playT = END; setMode('done'); }
+    }
+    if (REC) paint();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  // ?debug: a hook for automated checks (a separate live frame driven to the same instant)
+  if (qs.has('debug')) window.__spec = { async truth(T) { const fr = await makeFrame(); const t0 = fr.eng.now();
+    if (SCENES[sc].overview) beats.forEach((bt) => fr.w.setTimeout(() => bt.fire(fr.w.document, fr.w), bt.at)); else await FIRE[sc](fr.w.document, fr.w);
+    await flush(); const dt = END > 6000 ? 1000 / 60 : 1000 / 120; for (let t = dt; t <= T + 1e-6; t += dt) await fr.eng.advanceTo(t0 + t, dt); return fr.f; }, get ready() { return !!(REC && REC.done); }, get REC() { return REC; } };
+  async function rebuild() {                                    // scene or iteration changed: record it
+    const g = ++gen; setMode('idle'); playT = 0; headT = null; REC = null; lastShown = -1;
+    [...phone.querySelectorAll('iframe:not(.is-front)')].forEach((f) => f.remove());
+    $('veil').hidden = false; $('veil').textContent = 'Loading…';
+    setHead(0);
+    stateCur = '0.00s'; $('stateCur').textContent = stateCur;              // the readout starts at 0 with the new scene
+    stateEnd = `${(END / 1000).toFixed(2)}s`; $('stateEnd').textContent = stateEnd; $('stateCur').style.minWidth = `${stateEnd.length}ch`;
+    try { await record(g); } catch (e) { console.warn('[spec] recording failed', e); if (g === gen) { $('veil').hidden = false; $('veil').textContent = 'Preview unavailable — reload to try again.'; } }
+  }
+  function togglePlay() {
+    if (!REC || !REC.done) return;                              // still loading
+    if (mode === 'playing') { setMode('paused'); return; }
+    if (playT >= END - 1) playT = 0;
+    setMode('playing');
+  }
+  /* Scrubbing: press on the pin, the line, the ruler or any track and drag — the display
+     shows that exact moment in the same frame. A press on a track that doesn't move also
+     selects that track.                                                                  */
+  let scrubbing = null, downX = 0, downRow = null;
+  function scrubAt(clientX) {
+    const r = $('lane').getBoundingClientRect();
+    const T = Math.max(0, Math.min(END, ((clientX - r.left) / r.width) * END));
+    if (mode === 'playing' || mode === 'done' || mode === 'idle') setMode('paused');
+    playT = T; headT = null; paint();
+  }
+  const onMove = (e) => { if (e.pointerId === scrubbing) { e.preventDefault(); if (Math.abs(e.clientX - downX) > 2) downRow = null; scrubAt(e.clientX); } };
+  const onUp = (e) => {
+    if (e.pointerId !== scrubbing) return;
+    scrubbing = null; document.body.classList.remove('is-scrubbing');
+    removeEventListener('pointermove', onMove); removeEventListener('pointerup', onUp); removeEventListener('pointercancel', onUp);
+    if (downRow != null) select(downRow);
+  };
+  function startScrub(e, row = null) {
+    if (e.button !== 0 || scrubbing != null) return;
+    e.preventDefault(); scrubbing = e.pointerId; downX = e.clientX; downRow = row;
+    document.body.classList.add('is-scrubbing');
+    addEventListener('pointermove', onMove, { passive: false }); addEventListener('pointerup', onUp); addEventListener('pointercancel', onUp);
+    scrubAt(e.clientX);
+  }
+  for (const el of [$('scale'), $('grip'), $('headLine')]) el.addEventListener('pointerdown', (e) => startScrub(e));
+  $('rows').addEventListener('pointerdown', (e) => { const trk = e.target.closest('.row__trk'); if (trk) startScrub(e, +trk.parentElement.dataset.i); });
+  $('grip').addEventListener('keydown', (e) => { const step = e.shiftKey ? 100 : 1000 / 60;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); setMode('paused');
+      playT = Math.max(0, Math.min(END, playT + (e.key === 'ArrowRight' ? step : -step))); paint(); } });
+
+  function fit() {
+    const st = $('stage'), h = st.clientHeight || 520, s = Math.min(1, h / DH);
+    $('phone').style.transform = `scale(${s})`;
+    st.style.width = `${DW * s}px`; $('phone').style.marginBottom = `${-DH * (1 - s)}px`;
+  }
+  addEventListener('resize', fit);
+
+  /* ═══ wiring ═══════════════════════════════════════════════════════════════ */
+  function setScene(n) { sc = n; layerFilter = ''; history.replaceState(null, '', `?v=${v}&s=${sc}`); renderTimeline(); rebuild(); }
+  $('flow').addEventListener('click', (e) => {
+    const l = e.target.closest('button[data-l]'); if (l) { showLayer(l.dataset.l); return; }
+    const b = e.target.closest('button[data-s]'); if (!b) return;
+    if (+b.dataset.s !== sc) { setScene(+b.dataset.s); return; }
+    layerFilter = ''; applyFilter(); showScene();             // back to the whole scene
+  });
+  $('insp').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { setScene(+b.dataset.go); return; }
+    const l = e.target.closest('.anims button[data-l]'); if (l) { showLayer(l.dataset.l); return; }
+    const t = e.target.closest('.anims button[data-i]'); if (t) select(+t.dataset.i); });
+  $('rows').addEventListener('click', (e) => { const r = e.target.closest('.row'); if (!r || e.target.closest('.row__trk')) return;
+    if (layerFilter && rows[+r.dataset.i].layer !== layerFilter) { layerFilter = ''; applyFilter(); }
+    select(+r.dataset.i); });
+  $('rows').addEventListener('dblclick', (e) => { const r = e.target.closest('.row'); if (r && rows[+r.dataset.i].scene != null) setScene(rows[+r.dataset.i].scene); });
+  $('rows').addEventListener('keydown', (e) => { const r = e.target.closest('.row'); if (r && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); select(+r.dataset.i); } });
+  $('rows').addEventListener('mouseover', (e) => { const r = e.target.closest('.row'); if (r) highlight(rows[+r.dataset.i].sel); });
+  $('rows').addEventListener('mouseleave', () => { highlight(view === 'track' && rows[selected] ? rows[selected].sel : view === 'layer' ? layerSel(layerView) : null); });
+  $('play').addEventListener('click', () => togglePlay());
+  $('speed').addEventListener('click', () => { speedIdx = (speedIdx + 1) % SPEEDS.length; $('speedLbl').textContent = `× ${SPEEDS[speedIdx]}`; });
+  // toast — one at a time; a repeat replays its entrance. Stays 3s, and waits while it is hovered.
+  const CHECK = '<svg viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></svg>';
+  let toastT = 0;
+  function toast(msg, icon = CHECK) {
+    clearTimeout(toastT);
+    const el = document.createElement('div'); el.className = 'toast is-enter'; el.innerHTML = `${icon}<span>${msg}</span>`;
+    $('toasts').replaceChildren(el);
+    void el.offsetWidth; el.classList.remove('is-enter');      // commit the start state, then transition (no frame wait, so it also runs in a background tab)
+    let left = 3000, from = 0;
+    const close = () => { el.dataset.closing = ''; setTimeout(() => el.remove(), 140); };
+    const arm = () => { from = performance.now(); toastT = setTimeout(close, left); };
+    el.addEventListener('mouseenter', () => { clearTimeout(toastT); left = Math.max(800, left - (performance.now() - from)); });
+    el.addEventListener('mouseleave', arm);
+    arm();
+  }
+  async function copyText(t) {
+    try { await navigator.clipboard.writeText(t); return true; } catch (_) {}
+    try { const ta = document.createElement('textarea'); ta.value = t; ta.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(ta); ta.select();
+      const ok = document.execCommand('copy'); ta.remove(); return ok; } catch (_) { return false; }
+  }
+  let copyT = 0;
+  $('copy').addEventListener('click', async () => {
+    const ok = await copyText(location.href), b = $('copy');
+    b.innerHTML = ok ? `${CHECK}Copied` : 'Copy failed';
+    toast(ok ? 'Link copied' : 'Couldn’t copy the link', ok ? CHECK : '');
+    clearTimeout(copyT); copyT = setTimeout(() => { b.textContent = 'Copy link'; }, 2000);
+  });
+  addEventListener('keydown', (e) => { if (e.key === ' ' && e.target === document.body) { e.preventDefault(); togglePlay(); } });
+
+  document.title = window.SPEC.title.replace(/ — .*/, '') + ' Spec';
+  document.documentElement.style.setProperty('--pw', `${DW}px`); document.documentElement.style.setProperty('--ph', `${DH}px`);
+  if (window.SPEC.legend && window.SPEC.legend.approx) $('legendApprox').textContent = window.SPEC.legend.approx;
+  renderTimeline(); fit(); rebuild();
+})();
+</script>
+<script>
+/* Flow count beside the section head, as in the kit's sidebar — page chrome only, outside the shared engine */
+(() => {
+  const n = window.SPEC && window.SPEC.scenes ? window.SPEC.scenes.length : document.querySelectorAll('#flow li').length;
+  document.getElementById('flowCount').textContent = n || '';
+})();
+</script>
+<script>
+/* Iteration switcher — page chrome only, outside the shared engine (it reads ?v once, so switching reloads) */
+(() => {
+  const q = new URLSearchParams(location.search), v = +q.get('v') || 1, s = q.get('s') || '0', IT = window.SPEC.iterations;
+  document.getElementById('iters').innerHTML = Object.keys(IT).map((k) => { const [n, name] = IT[k].split(' · ');
+    return `<a href="?v=${k}&s=${s}"${+k === v ? ' aria-current="page"' : ''} title="${IT[k]}"><span>${n.replace('Iteration ', '')}&nbsp;·&nbsp;</span>${name}</a>`; }).join('');
+})();
+</script>
+</body>
+</html>

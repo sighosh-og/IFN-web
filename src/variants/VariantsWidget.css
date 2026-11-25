@@ -29,6 +29,8 @@
   transition: transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 .vw__pill:active { transform: scale(0.97); }
+.vw__pills { display: flex; align-items: center; gap: 8px; }
+.vw__spec { text-decoration: none; }
 .vw__pillText { font-weight: 700; }
 .vw__pillValue { color: rgba(255, 255, 255, 0.6); }
 
@@ -84,4 +86,4 @@
 @media (hover: hover) and (pointer: fine) {
   .vw__opt[aria-checked='false']:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
 }
-.vw__opt:focus-visible, .vw__pill:focus-visible { outline: 2px solid #3866df; outline-offset: 2px; }
+.vw__opt:focus-visible, .vw__pill:focus-visible, .vw__spec:focus-visible { outline: 2px solid #3866df; outline-offset: 2px; }

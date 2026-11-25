@@ -169,6 +169,9 @@
 @media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
   .pv__galleryBtn:hover .pv__stackCard { animation: pv-stack-wiggle 620ms cubic-bezier(0.37, 0, 0.3, 1) var(--delay) both; }
 }
+/* the spec sheet (/spec/) can't hover: it sets data-spec-hover to play the same states */
+.pv__galleryBtn[data-spec-hover] { background: var(--pv-btn-hover); }
+.pv__galleryBtn[data-spec-hover] .pv__stackCard { animation: pv-stack-wiggle 620ms cubic-bezier(0.37, 0, 0.3, 1) var(--delay) both; }
 @keyframes pv-stack-wiggle {
   0% { rotate: var(--r); translate: 0 0; }
   28% { rotate: calc(var(--r) + var(--w)); translate: var(--dx) -1px; }
@@ -560,6 +563,7 @@
 }
 /* hover: the photo eases in a touch inside its tile, so you can see which one you're about to open */
 @media (hover: hover) and (pointer: fine) { .pv__tile:hover img { scale: 1.05; } }
+.pv__tile[data-spec-hover] img { scale: 1.05; }
 .pv__tile:focus-visible img { scale: 1.05; }
 .pv__tile img[data-loaded] { opacity: 1; }
 

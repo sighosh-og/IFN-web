@@ -91,20 +91,13 @@ const initials = (name: string) => {
 
 /**
  * Figma Web IFN / Reviewer avatar: 40 round on alpha-light/16. The reviewer's photo when there is one,
- * otherwise their initials; anonymous reviewers get the Origin user-circle icon.
+ * otherwise their initials — always initials, anonymous reviewers included ("A").
  */
 function Avatar({ name, src }: { name: string; src?: string }) {
   const [failed, setFailed] = useState(false);
-  const anonymous = !name.trim() || /^anonymous$/i.test(name.trim());
   return (
     <span className="pv__avatar" aria-hidden>
-      {src && !failed ? (
-        <img src={src} alt="" onError={() => setFailed(true)} />
-      ) : anonymous ? (
-        <span className="pv__avatarIcon" />
-      ) : (
-        initials(name)
-      )}
+      {src && !failed ? <img src={src} alt="" onError={() => setFailed(true)} /> : initials(name)}
     </span>
   );
 }

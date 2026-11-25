@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 /**
  * Global prototype variants. Add a group here and it appears in the floating widget.
- * Every visit starts on the defaults (Black · Blurred · Mask); changes last until the page is reloaded.
+ * Every visit starts on the defaults (Black · Blurred · Mask · Bottom carousel · Reviewer top); changes last until the page is reloaded.
  * A link can still preselect values (?viewerTheme=white&photoSwap=slide) — handy for sharing one variant.
  */
 export const VARIANT_GROUPS = {
@@ -36,7 +36,7 @@ export const VARIANT_GROUPS = {
       { value: 'dots', label: 'Top dots' },
       { value: 'thumbs', label: 'Bottom carousel' },
     ],
-    default: 'dots',
+    default: 'thumbs',
   },
   reviewer: {
     label: 'Reviewer',
@@ -44,7 +44,7 @@ export const VARIANT_GROUPS = {
       { value: 'bottom', label: 'Bottom' },
       { value: 'top', label: 'Top, by close' },
     ],
-    default: 'bottom',
+    default: 'top',
   },
 } as const;
 

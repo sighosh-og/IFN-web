@@ -88,11 +88,15 @@ const initials = (name: string) => {
   return ([...words[0]][0] + [...words[words.length - 1]][0]).toUpperCase();
 };
 
-/** The reviewer's photo when there is one; otherwise (or if it fails to load) their initials. */
+/** A steady hue per name, from a fixed set that sits well on both themes. */
+const HUES = [212, 262, 330, 18, 38, 152, 186];
+const hueOf = (name: string) => HUES[[...name].reduce((h, c) => (h * 31 + c.codePointAt(0)!) >>> 0, 7) % HUES.length];
+
+/** The reviewer's photo when there is one; otherwise (or if it fails to load) their initials on a tint. */
 function Avatar({ name, src }: { name: string; src?: string }) {
   const [failed, setFailed] = useState(false);
   return (
-    <span className="pv__avatar" aria-hidden>
+    <span className="pv__avatar" style={{ '--h': hueOf(name) } as React.CSSProperties} aria-hidden>
       {src && !failed ? <img src={src} alt="" onError={() => setFailed(true)} /> : initials(name)}
     </span>
   );

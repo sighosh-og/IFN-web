@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState, type MutableRefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { useVariant } from '../variants/variants';
-import { photos, totalPhotos } from './data';
+import { photos } from './data';
 import { ReviewPanel } from './ReviewPanel';
 import { PhotoGrid } from './PhotoGrid';
 import { ReviewDots } from './ReviewDots';
@@ -8,6 +8,8 @@ import { ReviewThumbs } from './ReviewThumbs';
 import { SlideStrip } from './SlideStrip';
 import { IconArrow, IconClose } from './icons';
 import { GalleryButton } from './GalleryButton';
+import { FiltersModal, GalleryBar, NoResults } from './GalleryFilters';
+import { ALL_PHOTOS, DEFAULT_FILTERS, photoOrder, sameFilters, type Filters } from './filters';
 import type { ViewerMode } from './ViewerContext';
 import './viewer.css';
 
@@ -47,6 +49,7 @@ const BREATH = 0.965;
 const BREATH_AT = 0.32;
 const SINE = 'cubic-bezier(0.37, 0, 0.63, 1)';
 const PHOTO_R = 32; // Airbnb viewer radius
+const LOAD_MS = 600; // the prototype's stand-in for fetching a new page of results (placeholder tiles meanwhile)
 const TILE_R = 16; // Airbnb grid radius
 
 const rectOf = (el: Element): Rect => {
@@ -91,10 +94,41 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   const flyer = useRef<HTMLDivElement>(null);
   const focusBack = useRef<Element | null>(null);
 
+  // ---------- gallery sort + filters (Figma flow 4) ----------
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+  const filterChip = useRef<HTMLButtonElement>(null);
+  const order = useMemo(() => photoOrder(filters), [filters]);
+  // the grid keeps the last non-empty layout as placeholders while a request is out
+  const shown = useRef(order);
+  if (order.length || !loading) shown.current = order;
+  // photo mode pages through the gallery's order; a photo outside it (opened from the PDP) pages through all
+  const nav = order.includes(index) ? order : ALL_PHOTOS;
+  const at = nav.indexOf(index);
+
+  const loadTimer = useRef(0);
+  const applyFilters = useCallback((f: Filters) => {
+    setFiltersOpen(false);
+    setFilters((cur) => (sameFilters(cur, f) ? cur : f));
+    setReloadKey((k) => k + 1);
+    setLoading(true);
+    clearTimeout(loadTimer.current);
+    loadTimer.current = window.setTimeout(() => setLoading(false), LOAD_MS);
+  }, []);
+  const dismissFilters = useCallback(() => setFiltersOpen(false), []);
+  useEffect(() => () => clearTimeout(loadTimer.current), []);
+
   // ---------- open / close ----------
   useEffect(() => {
     if (open) {
       focusBack.current = document.activeElement;
+      // every opening starts on the default sort with no filters
+      clearTimeout(loadTimer.current);
+      setFilters(DEFAULT_FILTERS);
+      setFiltersOpen(false);
+      setLoading(false);
       setClosing(false);
       setPresent(true);
       const from = origin.current;
@@ -183,7 +217,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   useEffect(() => { if (pending.current === index) pending.current = null; }, [index]);
   useEffect(() => { pending.current = null; stepToken.current++; }, [open, mode]); // a closed/switched viewer forgets queued steps
   const step = (i: number) => {
-    if (i < 0 || i >= photos.length || i === (pending.current ?? index)) return;
+    if (i === undefined || i < 0 || i >= photos.length || i === (pending.current ?? index)) return;
     const token = ++stepToken.current;
     if (swap === 'slide') return onIndex(i); // the spring starts at once; neighbours are already preloaded
     pending.current = i;
@@ -196,7 +230,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   };
 
   /** relative move (arrows, keys, swipe) — counts from a step still in flight */
-  const move = (delta: number) => step((pending.current ?? index) + delta);
+  const move = (delta: number) => step(nav[nav.indexOf(pending.current ?? index) + delta]);
 
   const [leaving, setLeaving] = useState<number | null>(null);
   const last = useRef({ index, mode, open });
@@ -248,7 +282,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
 
   // keyboard
   useEffect(() => {
-    if (!open) return;
+    if (!open || filtersOpen) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); onClose(); }
       else if (e.key === 'Tab' && sheet.current) {
@@ -290,7 +324,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
   useEffect(() => {
     if (!open) return;
     for (const d of [1, -1, 2]) {
-      const p = photos[index + d];
+      const p = photos[nav[at + d]];
       if (p) new Image().src = p.src;
     }
   }, [open, index]);
@@ -341,7 +375,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
               <GalleryButton openedAt={openedAt.current} onClick={toGrid} />
               {reviewPhotos === 'dots' ? <ReviewDots index={index} onIndex={step} /> : <div className="pv__pips" aria-hidden />}
               <span className="pv__sr" aria-live="polite" aria-atomic="true">
-                Photo {index + 1} of {photos.length}
+                Photo {at + 1} of {nav.length}
               </span>
               <button type="button" className="pv__icon pv__close" aria-label="Close" onClick={onClose}>
                 <IconClose />
@@ -349,12 +383,12 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
             </header>
 
             <div className="pv__stage" onWheel={onWheel} data-thumbs={reviewPhotos === 'thumbs' || undefined}>
-              <button type="button" className="pv__arrow pv__arrow--prev" aria-label="Previous photo" disabled={index === 0} onClick={() => move(-1)}>
+              <button type="button" className="pv__arrow pv__arrow--prev" aria-label="Previous photo" disabled={at <= 0} onClick={() => move(-1)}>
                 <IconArrow dir="left" />
               </button>
               <div ref={frame} className="pv__frame" data-swap={swap}>
                 {swap === 'slide' && box && (
-                  <SlideStrip index={index} box={box} stageW={frame.current?.parentElement?.clientWidth ?? box.w} hidden={hidePhoto} />
+                  <SlideStrip at={at} seq={nav} box={box} stageW={frame.current?.parentElement?.clientWidth ?? box.w} hidden={hidePhoto} />
                 )}
                 {swap === 'mask' && size && box && (
                   <div
@@ -380,7 +414,7 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
                   </div>
                 )}
               </div>
-              <button type="button" className="pv__arrow pv__arrow--next" aria-label="Next photo" disabled={index === photos.length - 1} onClick={() => move(1)}>
+              <button type="button" className="pv__arrow pv__arrow--next" aria-label="Next photo" disabled={at >= nav.length - 1} onClick={() => move(1)}>
                 <IconArrow dir="right" />
               </button>
               {reviewPhotos === 'thumbs' && <ReviewThumbs index={index} onIndex={step} />}
@@ -392,25 +426,39 @@ export function PhotoViewer({ open, mode, index, origin, onIndex, onMode, onClos
 
         {showGrid && (
           <div className="pv__layer pv__gridMode" data-leaving={mode !== 'grid' || undefined}>
-            <header className="pv__bar pv__bar--grid">
-              <span />
-              <div className="pv__gridTitle">
-                <span className="pv__gridTitleMain">Customer photos</span>
-                <span className="pv__gridTitleSub">
-                  {photos.length} of {totalPhotos.toLocaleString('en-US')}
-                </span>
-              </div>
-              <button type="button" className="pv__icon pv__close" aria-label="Close" onClick={onClose}>
-                <IconClose />
-              </button>
-            </header>
-            <PhotoGrid
-              current={index}
-              hiddenIndex={hideTile}
-              onPick={pickFromGrid}
-              onLaidOut={onGridLaidOut}
-              reveal={transit?.kind !== 'toGrid'}
+            <GalleryBar
+              filters={filters}
+              onApply={applyFilters}
+              onOpenFilters={() => setFiltersOpen(true)}
+              modalOpen={filtersOpen}
+              onClose={onClose}
+              filterChip={filterChip}
             />
+            {shown.current.length ? (
+              <PhotoGrid
+                current={index}
+                hiddenIndex={hideTile}
+                onPick={pickFromGrid}
+                onLaidOut={onGridLaidOut}
+                reveal={transit?.kind !== 'toGrid'}
+                order={shown.current}
+                loading={loading}
+                reloadKey={reloadKey}
+                startAtTop={loading}
+              />
+            ) : (
+              <NoResults onClear={() => applyFilters(DEFAULT_FILTERS)} />
+            )}
+            <FiltersModal
+              open={filtersOpen}
+              filters={filters}
+              onApply={applyFilters}
+              onDismiss={dismissFilters}
+              returnTo={filterChip}
+            />
+            <span className="pv__sr" aria-live="polite" aria-atomic="true">
+              {loading ? 'Loading photos' : order.length ? `${order.length} photos` : 'No photos match these filters'}
+            </span>
           </div>
         )}
       </div>

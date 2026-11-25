@@ -19,10 +19,19 @@ type Props = {
   onLaidOut: (grid: HTMLElement) => void;
   /** read once on mount: true when opened straight into the grid (not morphing in from a photo) */
   reveal?: boolean;
+  /** photo indices to show, in order (sort + filters applied) */
+  order: number[];
+  /** results are on their way: tiles show the placeholder only (Figma 4.2) */
+  loading?: boolean;
+  /** bumps whenever new results are requested — the grid goes back to the top */
+  reloadKey?: number;
+  /** read once on mount: open at the top instead of on the current photo (results that just loaded) */
+  startAtTop?: boolean;
 };
 
 /** Airbnb-style masonry: each photo drops into the currently shortest column, keeping its own aspect ratio. */
-export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut, reveal = false }: Props) {
+export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut, reveal = false, order, loading = false, reloadKey = 0, startAtTop = false }: Props) {
+  const topOnMount = useRef(startAtTop);
   const revealOnMount = useRef(reveal);
   const scroller = useRef<HTMLDivElement>(null);
   const box = useRef<HTMLDivElement>(null);
@@ -41,7 +50,8 @@ export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut, reveal = fa
     if (!width) return { items: [], height: 0 };
     const colW = (width - GAP * (cols - 1)) / cols;
     const heights = new Array(cols).fill(0);
-    const items = photos.map((p, i) => {
+    const items = order.map((i) => {
+      const p = photos[i];
       const c = heights.indexOf(Math.min(...heights));
       const h = Math.round((colW * p.h) / p.w);
       const item = { i, x: c * (colW + GAP), y: heights[c], w: colW, h };
@@ -49,37 +59,45 @@ export function PhotoGrid({ current, hiddenIndex, onPick, onLaidOut, reveal = fa
       return item;
     });
     return { items, height: Math.max(...heights) - GAP };
-  }, [width, cols]);
+  }, [width, cols, order]);
 
   // first layout: bring the photo you were on into view, then let the viewer start its morph
   const ready = layout.items.length > 0;
   useLayoutEffect(() => {
     if (!ready) return;
-    const it = layout.items[current];
+    const it = layout.items.find((t) => t.i === current);
     const s = scroller.current!;
-    if (it) s.scrollTop = Math.max(0, it.y + 16 - (s.clientHeight - it.h) / 2);
+    if (it && !topOnMount.current) s.scrollTop = Math.max(0, it.y + 16 - (s.clientHeight - it.h) / 2);
     if (revealOnMount.current) populate(box.current!, layout.items, s.scrollTop, s.clientHeight);
     onLaidOut(box.current!);
   }, [ready]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // new results load from the top
+  const firstKey = useRef(reloadKey);
+  useLayoutEffect(() => {
+    if (reloadKey !== firstKey.current) scroller.current!.scrollTop = 0;
+  }, [reloadKey]);
+
+  const near = Math.max(0, order.indexOf(current));
   return (
     <div ref={scroller} className="pv__gridScroll">
-      <div ref={box} className="pv__grid" style={{ height: layout.height }}>
-        {layout.items.map(({ i, x, y, w, h }) => (
+      <div ref={box} className="pv__grid" style={{ height: layout.height }} data-loading={loading || undefined} aria-busy={loading}>
+        {layout.items.map(({ i, x, y, w, h }, rank) => (
           <button
             key={photos[i].src}
             type="button"
             className="pv__tile"
             data-index={i}
             style={{ left: x, top: y, width: w, height: h, visibility: hiddenIndex === i ? 'hidden' : undefined }}
-            aria-label={`Open photo ${i + 1} of ${photos.length}`}
-            onClick={(e) => onPick(i, e.currentTarget)}
+            aria-label={`Open photo ${rank + 1} of ${order.length}`}
+            tabIndex={loading ? -1 : undefined}
+            onClick={(e) => !loading && onPick(i, e.currentTarget)}
           >
             <img
               ref={markIfLoaded}
               src={photos[i].src}
               alt=""
-              loading={Math.abs(i - current) < 16 ? 'eager' : 'lazy'}
+              loading={Math.abs(rank - near) < 16 ? 'eager' : 'lazy'}
               onLoad={(e) => e.currentTarget.setAttribute('data-loaded', '')}
             />
           </button>

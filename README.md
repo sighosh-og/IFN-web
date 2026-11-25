@@ -35,6 +35,14 @@ To drop a component *inside* a fragment, have `scripts/extract.mjs` replace that
   - Reviewer: Top, by close (default): a 40px round avatar slot (the reviewer's photo when there is one, else their initials on a tint picked from their name) with the name and date in the panel's top band, vertically centred on the close button, crossfading with the review. The helpful button then sits alone on the left at the bottom. Or Bottom: name · date beside the helpful button, `?reviewer=bottom`.
   - Also: horizontal trackpad swipe = one step per gesture; Tab is trapped in the dialog; position is announced ("Photo n of 80"); focus returns to the opener on close; classic scrollbars are compensated while the page is locked.
   - Grid mode: 4-column masonry with 16px corners, no badges and no hover. Opened from View all, the on-screen tiles populate in a staggered rise + fade (18px, 0.97 → 1, 520ms, 22ms apart, top-left first; `populate()` in `PhotoGrid.tsx`), and each photo fades in once loaded. Coming from a photo, the morph is used instead.
+  - Gallery sort + filters (Figma flow 4, 5400:6224): the grid's top bar is a chip row:
+    - **Chips:** Filter (n), the four sort chips and Verified purchases. Sort chips and Verified apply on click.
+    - **Filters modal:** centred, 560 wide. It has Sort by, Rating (multi-select), "Show reviews for this variant" (Pro Max · Silver · 256 GB · International) and Verified. Nothing applies until Show results, which shows a loader. Esc, × or a scrim click discards the changes. Clear filters resets the modal and keeps it open.
+    - **Results:** the grid reloads from the top. Tiles show placeholders for 600ms, then the photos fade in.
+    - **No results:** an empty state with Clear filters (4★ + this variant hits it).
+    - **Photo view:** arrows page through the filtered order.
+    - **Reset:** every opening starts on Most helpful with no filters.
+    - **Code:** `filters.ts` holds the logic and `GalleryFilters.tsx` the UI.
   - Shared-element morphs: strip tile → photo on open, photo → strip tile on close, photo ⇄ grid tile. A single flyer runs all of them (`Transit` in `PhotoViewer.tsx`).
   - Review panel, docked right (Figma 5314:6610, "Panel v3"): rating pill + Verified Buy, title, full comment, variant chips, "See Translation" on Arabic reviews, dashed divider, then name · date and a helpful (thumbs-up) count; liking swaps to Origin's thumbs-up-filled with a small pop. Changing review crossfades the old and new review (out 220ms, in 420ms with a 6px rise and 2px blur). Icons live in public/viewer/. The panel stays still while you step within one review; the top-bar dots show where you are in it.
   - Photos in the captured review cards also open the view.

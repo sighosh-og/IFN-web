@@ -17,7 +17,9 @@ const DEPTH = 0.08; // how much smaller a card is one step away
 const OMEGA = 15; // spring stiffness (rad/s): main travel ~350ms, settled by ~550ms, no overshoot
 const RADIUS = 32;
 
-export function SlideStrip({ index, box, stageW, hidden }: { index: number; box: Rect; stageW: number; hidden: boolean }) {
+/** `seq` = the photo indices being paged through (the gallery's sort + filters); `at` = position in it. */
+export function SlideStrip({ at: index, seq, box, stageW, hidden }: { at: number; seq: number[]; box: Rect; stageW: number; hidden: boolean }) {
+  const photoAt = (k: number) => photos[seq[k]];
   const [pos, setPos] = useState(index); // strip position in photo units
   const state = useRef({ x: index, v: 0, target: index, raf: 0, last: 0 });
 
@@ -59,7 +61,7 @@ export function SlideStrip({ index, box, stageW, hidden }: { index: number; box:
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fitOf = (i: number) => {
-    const p = photos[i];
+    const p = photoAt(i);
     const k = Math.min(box.w / p.w, box.h / p.h);
     return { w: p.w * k, h: p.h * k };
   };
@@ -72,13 +74,13 @@ export function SlideStrip({ index, box, stageW, hidden }: { index: number; box:
     for (let j = i; j < from; j++) x -= gapAfter(j);
     return x;
   };
-  const base = Math.max(0, Math.min(photos.length - 1, Math.floor(pos)));
+  const base = Math.max(0, Math.min(seq.length - 1, Math.floor(pos)));
   const frac = pos - base;
-  const scroll = base < photos.length - 1 ? frac * gapAfter(base) : 0; // strip position past photo `base`
+  const scroll = base < seq.length - 1 ? frac * gapAfter(base) : 0; // strip position past photo `base`
 
   const cards = [];
   for (let i = base - 1; i <= base + 2; i++) {
-    const p = photos[i];
+    const p = photoAt(i);
     if (!p) continue;
     const t = i - pos; // steps away from centre (signed)
     if (Math.abs(t) >= 0.999 && pos === index) continue; // at rest: only the current photo exists
@@ -103,7 +105,7 @@ export function SlideStrip({ index, box, stageW, hidden }: { index: number; box:
       >
         <img
           src={p.src}
-          alt={i === index ? `Customer photo ${i + 1}` : ''}
+          alt={i === index ? `Customer photo ${seq[i] + 1}` : ''}
           style={{ left: (w - iw) / 2 + shift, top: (h - ih) / 2, width: iw, height: ih }}
           draggable={false}
         />

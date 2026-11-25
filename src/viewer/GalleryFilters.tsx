@@ -39,6 +39,9 @@ type BarProps = {
 
 export function GalleryBar({ filters, onApply, onOpenFilters, modalOpen, onClose, filterChip }: BarProps) {
   const n = activeCount(filters);
+  // keep the last count on screen while " (n)" folds away, so the text doesn't vanish before the width does
+  const lastN = useRef(n);
+  if (n > 0) lastN.current = n;
   return (
     <header className="pv__bar gf__bar">
       <div className="gf__chips" role="toolbar" aria-label="Sort and filter photos">
@@ -52,7 +55,13 @@ export function GalleryBar({ filters, onApply, onOpenFilters, modalOpen, onClose
           onClick={onOpenFilters}
         >
           <IconPrefs />
-          <span>Filter{n > 0 && ` (${n})`}</span>
+          <span>
+            Filter
+            {/* " (n)" opens and closes its width instead of jumping, so the chips after it glide */}
+            <span className="gf__count" data-on={n > 0 || undefined} aria-hidden={n === 0 || undefined}>
+              <span>{lastN.current > 0 ? ` (${lastN.current})` : ""}</span>
+            </span>
+          </span>
           <IconCaret />
         </button>
         {SORTS.map((s) => (

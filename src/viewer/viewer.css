@@ -616,6 +616,17 @@
   transition: border-color 150ms ease, transform 150ms ease;
 }
 .pv .gf__chip svg { flex: none; }
+.pv .gf__chip > span { display: inline-flex; white-space: pre; }
+/* Filter (n): the count's width folds open/closed (0fr ↔ 1fr) so the chips after it slide, never jump */
+.gf__count {
+  display: inline-grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  transition: grid-template-columns 280ms cubic-bezier(0.32, 0.72, 0, 1), opacity 160ms ease-out;
+}
+.gf__count[data-on] { grid-template-columns: 1fr; opacity: 1; transition-delay: 0ms, 60ms; }
+.gf__count > span { min-width: 0; overflow: hidden; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .gf__count { transition: opacity 120ms ease-out; } }
 .pv .gf__chip:active { transform: scale(0.97); }
 @media (hover: hover) and (pointer: fine) { .pv .gf__chip:hover { border-color: var(--gf-chip-hover); } }
 .pv .gf__chip[data-selected] { border-color: var(--gf-chip-on); }

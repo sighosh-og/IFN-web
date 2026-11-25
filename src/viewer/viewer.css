@@ -82,8 +82,8 @@
   --pv-rv-muted: #989fb3;
   --pv-rv-chip: rgba(255, 255, 255, 0.16);
   --pv-rv-dash: rgba(255, 255, 255, 0.16);
-  --pv-rv-like: rgba(255, 255, 255, 0.08);
-  --pv-rv-like-on: rgba(255, 255, 255, 0.16);
+  --pv-rv-like: rgba(255, 255, 255, 0.16); /* Figma Like Button: alpha-light/16 in both Default and Liked */
+  --pv-rv-like-on: rgba(255, 255, 255, 0.24); /* hover: alpha-light/24 */
 }
 
 .pv button { font: inherit; color: inherit; }

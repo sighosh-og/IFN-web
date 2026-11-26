@@ -4,6 +4,8 @@ A 1:1 copy of the desktop noon PDP for
 [iPhone 17 Pro Max 256 GB Silver](https://www.noon.com/uae-en/iphone-17-pro-max-256-gb-silver-5g-e-sim-only-middle-east-version/N70211544V/p/?o=ae59905acac1d0de),
 to use as the starting point for feature prototypes.
 
+Repo: [github.com/sighosh-og/IFN-web](https://github.com/sighosh-og/IFN-web) (push over SSH).
+
 ```bash
 npm run dev        # http://localhost:5211
 ```
